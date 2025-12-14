@@ -104,6 +104,8 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [aiContextItems, setAiContextItems] = useState<string[]>([]);
   const [incidentViewSet, setIncidentViewSet] = useState(false);
+  const [dataLayerRegionFilter, setDataLayerRegionFilter] = useState<string[]>([]);
+  const [dataLayerIncidentFilter, setDataLayerIncidentFilter] = useState<string[]>([]);
   // Removed: auto-swap map behavior after Tesoro prompt
 
 
@@ -332,6 +334,10 @@ export default function App() {
               setMapCenter(center);
               setMapScale(scale);
             }
+          }}
+          onApplyDataLayerFilter={(incident: string) => {
+            setDataLayerRegionFilter([]); // Clear region filter (select all)
+            setDataLayerIncidentFilter([incident]);
           }}
         />;
       case 'incident-roster':
@@ -689,9 +695,13 @@ export default function App() {
             <div className="absolute right-4 z-40" style={{ top: '80px', width: '360px' }}>
               <div className="relative">
                 <DataLayers
-                  className="bg-card border border-border rounded-md shadow-sm"
-                  style={{ height: '540px' }}
+                  className="border border-border rounded-md shadow-sm"
+                  style={{ height: '540px', backgroundColor: 'black' }}
                   onCollapse={() => setRightPanelCollapsed(true)}
+                  regionFilter={dataLayerRegionFilter}
+                  setRegionFilter={setDataLayerRegionFilter}
+                  incidentFilter={dataLayerIncidentFilter}
+                  setIncidentFilter={setDataLayerIncidentFilter}
                 />
               </div>
             </div>
@@ -859,12 +869,13 @@ export default function App() {
               </div>
             </div>
           )}
-          <div className="absolute top-4 right-4 z-30">
+          <div className="absolute top-4 right-4 z-[60]">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowFullscreenMap(false)}
               className="hover:bg-muted flex items-center gap-2"
+              style={{ backgroundColor: 'black' }}
             >
               <X className="w-4 h-4" />
               Exit Map
@@ -896,17 +907,31 @@ export default function App() {
           {mapPanelDock === 'left' ? (
             <>
               {!leftPanelCollapsed && (
-                <div className="absolute top-0 bottom-0 left-0 border-r border-border" style={{ width: '33.33vw' }}>
-                  <div className="relative h-full flex flex-col bg-background">
+                <div className="absolute top-0 bottom-0 left-0 border-r border-border" style={{ width: '33.33vw', overflow: 'hidden', backgroundColor: 'black' }}>
+                  <div className="relative h-full flex flex-col" style={{ overflow: 'hidden', backgroundColor: 'black' }}>
                     {/* Drag-to-bottom handle removed */}
-                    <div className="border-b border-border flex-shrink-0">
-                      <div className="flex items-center justify-between">
-                        <PlanningPStepper
-                          phases={displayedPeriod.phases}
-                          currentPhaseId={currentPhaseId}
-                          onPhaseSelect={setCurrentPhaseId}
-                          operationalPeriodNumber={displayedPeriod.number}
-                        />
+                    <div className="border-b border-border flex-shrink-0" style={{ position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'black' }}>
+                      <style>{`
+                        .planning-stepper-map-view .bg-card {
+                          background-color: black !important;
+                          border-bottom: none !important;
+                        }
+                        .planning-stepper-map-view .justify-center {
+                          justify-content: flex-start !important;
+                        }
+                        .planning-stepper-map-view button::after {
+                          display: none !important;
+                        }
+                      `}</style>
+                      <div className="flex items-center justify-between planning-stepper-map-view">
+                        <div style={{ flex: 1 }}>
+                          <PlanningPStepper
+                            phases={displayedPeriod.phases}
+                            currentPhaseId={currentPhaseId}
+                            onPhaseSelect={setCurrentPhaseId}
+                            operationalPeriodNumber={displayedPeriod.number}
+                          />
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -919,7 +944,7 @@ export default function App() {
                       </div>
                     </div>
               {/* Planning content - fills remaining space above fixed chat */}
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
                 <div className="h-full overflow-y-auto p-6">
                   {renderCurrentPhase()}
                 </div>

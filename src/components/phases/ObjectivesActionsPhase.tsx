@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Checkbox } from '../ui/checkbox';
-import { Edit2, Trash2, ChevronRight, ChevronDown, Map, Check, X } from 'lucide-react';
+import { Edit2, Trash2, ChevronRight, ChevronDown, Map, Check, X, Filter } from 'lucide-react';
 import svgPaths from '../../imports/svg-7hg6d30srz';
 
 interface Action {
@@ -37,9 +37,10 @@ interface ObjectivesActionsPhaseProps {
   onRecommendActions?: () => void;
   onZoomToLocation?: (center: string, scale: string) => void;
   onAddAIContext?: (itemName: string) => void;
+  onApplyDataLayerFilter?: (incident: string) => void;
 }
 
-export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, onPrevious, onRecommendActions, onZoomToLocation, onAddAIContext }: ObjectivesActionsPhaseProps) {
+export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, onPrevious, onRecommendActions, onZoomToLocation, onAddAIContext, onApplyDataLayerFilter }: ObjectivesActionsPhaseProps) {
   const [objectives, setObjectives] = useState<Objective[]>(data.objectives || [
     {
       id: '1',
@@ -210,6 +211,27 @@ export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, on
         return { center: '-88.0399,30.6954', scale: '144447.638572' };
       default:
         return { center: '-74.006,40.7128', scale: '72223.819286' }; // Default to NYC
+    }
+  };
+
+  // Get data layer incident filter value for each incident
+  const getIncidentFilterValue = (id: string): string => {
+    // Map incident IDs to their incident filter values
+    switch (id) {
+      case '1':
+        return 'gulf-coast-pipeline';
+      case '1a':
+        return 'bayou-dularge';
+      case '1b':
+        return 'estuarine-wildlife';
+      case '3':
+        return 'delaware-river-tanker';
+      case '3a':
+        return 'port-terminal';
+      case '3b':
+        return 'delaware-estuary';
+      default:
+        return 'gulf-coast-pipeline';
     }
   };
 
@@ -1198,6 +1220,20 @@ export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, on
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    // Apply data layer filter
+                    if (onApplyDataLayerFilter) {
+                      const incident = getIncidentFilterValue(objective.id);
+                      onApplyDataLayerFilter(incident);
+                    }
+                  }}
+                  className="p-1 hover:bg-muted/30 rounded transition-colors"
+                  title="Filter incident"
+                >
+                  <Filter className="w-3 h-3 text-white" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                     // Zoom to incident location
                     if (onZoomToLocation) {
                       const coords = getIncidentCoordinates(objective.id);
@@ -1339,6 +1375,20 @@ export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, on
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Apply data layer filter
+                                            if (onApplyDataLayerFilter) {
+                                              const incident = getIncidentFilterValue(child.id);
+                                              onApplyDataLayerFilter(incident);
+                                            }
+                                          }}
+                                          className="p-1 hover:bg-muted/30 rounded transition-colors"
+                                          title="Filter child incident"
+                                        >
+                                          <Filter className="w-3 h-3 text-white" />
+                                        </button>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();

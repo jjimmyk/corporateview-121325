@@ -3,9 +3,14 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { ChevronDown, ChevronRight, Edit2, Trash2, Map, Maximize2 } from 'lucide-react';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { ChevronDown, ChevronRight, Edit2, Trash2, Map, Maximize2, Check, X } from 'lucide-react';
 import svgPaths from '../imports/svg-7hg6d30srz';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Table, TableBody, TableCell, TableRow } from './ui/table';
 
 type DataLayersProps = {
   className?: string;
@@ -13,9 +18,23 @@ type DataLayersProps = {
   orientation?: 'vertical' | 'horizontal';
   onHandlePointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
   onCollapse?: () => void;
+  regionFilter?: string[];
+  setRegionFilter?: (filter: string[]) => void;
+  incidentFilter?: string[];
+  setIncidentFilter?: (filter: string[]) => void;
 };
 
-export function DataLayers({ className, style, orientation = 'vertical', onHandlePointerDown, onCollapse }: DataLayersProps) {
+export function DataLayers({ 
+  className, 
+  style, 
+  orientation = 'vertical', 
+  onHandlePointerDown, 
+  onCollapse,
+  regionFilter: externalRegionFilter,
+  setRegionFilter: externalSetRegionFilter,
+  incidentFilter: externalIncidentFilter,
+  setIncidentFilter: externalSetIncidentFilter
+}: DataLayersProps) {
   const [myArcGISExpanded, setMyArcGISExpanded] = React.useState(false);
   const [weatherExpanded, setWeatherExpanded] = React.useState(false);
   const [resourcesExpanded, setResourcesExpanded] = React.useState(false);
@@ -45,6 +64,26 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
   const [layerModalCategory, setLayerModalCategory] = React.useState<string | null>(null);
   const [individualLayerModalOpen, setIndividualLayerModalOpen] = React.useState(false);
   const [selectedIndividualLayer, setSelectedIndividualLayer] = React.useState<string | null>(null);
+  const [fieldsExpanded, setFieldsExpanded] = React.useState(false);
+  const [localRegionFilter, setLocalRegionFilter] = React.useState<string[]>([]);
+  const [localIncidentFilter, setLocalIncidentFilter] = React.useState<string[]>([]);
+  const [addLayerSearchOpen, setAddLayerSearchOpen] = React.useState(false);
+  const [selectedLayersToMove, setSelectedLayersToMove] = React.useState<string[]>([]);
+  const [categoryLayers, setCategoryLayers] = React.useState<Record<string, string[]>>({});
+  const [expandedModalLayers, setExpandedModalLayers] = React.useState<Set<string>>(new Set());
+  const [objectsExpanded, setObjectsExpanded] = React.useState(false);
+  const [expandedObjects, setExpandedObjects] = React.useState<Set<string>>(new Set());
+  const [objectSearchTerm, setObjectSearchTerm] = React.useState('');
+  const [addLayerModalOpen, setAddLayerModalOpen] = React.useState(false);
+  const [addLayerMode, setAddLayerMode] = React.useState<'upload' | 'draw'>('upload');
+  const [addLayerCategory, setAddLayerCategory] = React.useState<string>('No Category');
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = React.useState(false);
+
+  // Use external filters if provided, otherwise use local state
+  const regionFilter = externalRegionFilter !== undefined ? externalRegionFilter : localRegionFilter;
+  const setRegionFilter = externalSetRegionFilter !== undefined ? externalSetRegionFilter : setLocalRegionFilter;
+  const incidentFilter = externalIncidentFilter !== undefined ? externalIncidentFilter : localIncidentFilter;
+  const setIncidentFilter = externalSetIncidentFilter !== undefined ? externalSetIncidentFilter : setLocalIncidentFilter;
 
   const toggleLayer = (layerId: string) => {
     setExpandedLayers(prev => {
@@ -65,39 +104,337 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
 
   const openIndividualLayerModal = (layerName: string) => {
     setSelectedIndividualLayer(layerName);
+    setFieldsExpanded(false);
     setIndividualLayerModalOpen(true);
   };
 
+  const getLayerRegion = (layerName: string): string => {
+    const gulfCoastLayers = [
+      'Radar Precipitation',
+      'Active Weather Warnings',
+      'Staging Areas',
+      'Boom Deployment Lines',
+      'Skimmer Operations',
+      'Priority Protection Areas',
+      'Boom Anchor Points'
+    ];
+    const midAtlanticLayers = [
+      'Critical Facilities',
+      'AIS Vessel Tracks',
+      'Patrol Sectors'
+    ];
+    
+    if (gulfCoastLayers.includes(layerName)) return 'gulf-coast';
+    if (midAtlanticLayers.includes(layerName)) return 'mid-atlantic';
+    return 'all';
+  };
+
+  const getLayerIncident = (layerName: string): string => {
+    // Gulf Coast Pipeline Spill (parent)
+    const gulfCoastPipelineLayers = [
+      'Radar Precipitation',
+      'Active Weather Warnings'
+    ];
+    // Bayou Dularge Contamination (child)
+    const bayouDulargeLayers = [
+      'Staging Areas',
+      'Boom Deployment Lines'
+    ];
+    // Estuarine Wildlife Area Response (child)
+    const estuarineWildlifeLayers = [
+      'Skimmer Operations',
+      'Priority Protection Areas',
+      'Boom Anchor Points'
+    ];
+    // Delaware River Tanker Spill (parent)
+    const delawareRiverTankerLayers = [
+      'Critical Facilities'
+    ];
+    // Port Terminal Contamination (child)
+    const portTerminalLayers = [
+      'AIS Vessel Tracks'
+    ];
+    // Delaware Estuary Shoreline Protection (child)
+    const delawareEstuaryLayers = [
+      'Patrol Sectors'
+    ];
+    
+    if (gulfCoastPipelineLayers.includes(layerName)) return 'gulf-coast-pipeline';
+    if (bayouDulargeLayers.includes(layerName)) return 'bayou-dularge';
+    if (estuarineWildlifeLayers.includes(layerName)) return 'estuarine-wildlife';
+    if (delawareRiverTankerLayers.includes(layerName)) return 'delaware-river-tanker';
+    if (portTerminalLayers.includes(layerName)) return 'port-terminal';
+    if (delawareEstuaryLayers.includes(layerName)) return 'delaware-estuary';
+    return 'all';
+  };
+
+  const shouldShowCategory = (categoryLayers: string[]): boolean => {
+    if (regionFilter.length === 0 && incidentFilter.length === 0) return true;
+    
+    return categoryLayers.some(layer => {
+      const matchesRegion = regionFilter.length === 0 || regionFilter.includes(getLayerRegion(layer));
+      const matchesIncident = incidentFilter.length === 0 || incidentFilter.includes(getLayerIncident(layer));
+      return matchesRegion && matchesIncident;
+    });
+  };
+
+  const getAllLayers = (): string[] => {
+    const allCategories = ['weather', 'resources', 'tactics', 'grs', 'vessels'];
+    const allLayers: string[] = [];
+    allCategories.forEach(category => {
+      getLayersForCategory(category).forEach(layer => {
+        allLayers.push(layer.name);
+      });
+    });
+    return allLayers;
+  };
+
+  const moveLayersToCategory = () => {
+    if (!layerModalCategory || selectedLayersToMove.length === 0) return;
+    
+    // Add selected layers to the target category
+    setCategoryLayers(prev => ({
+      ...prev,
+      [layerModalCategory]: [
+        ...(prev[layerModalCategory] || []),
+        ...selectedLayersToMove.filter(layer => !(prev[layerModalCategory] || []).includes(layer))
+      ]
+    }));
+    
+    // Clear selection and close dropdown
+    setSelectedLayersToMove([]);
+    setAddLayerSearchOpen(false);
+  };
+
+  const toggleModalLayer = (layerName: string) => {
+    setExpandedModalLayers(prev => {
+      const next = new Set(prev);
+      if (next.has(layerName)) {
+        next.delete(layerName);
+      } else {
+        next.add(layerName);
+      }
+      return next;
+    });
+  };
+
+  const toggleObject = (objectName: string) => {
+    setExpandedObjects(prev => {
+      const next = new Set(prev);
+      if (next.has(objectName)) {
+        next.delete(objectName);
+      } else {
+        next.add(objectName);
+      }
+      return next;
+    });
+  };
+
+  const getObjectFields = (objectName: string): Array<{ field: string; value: string; source: string; lastUpdated: string }> => {
+    // Return mock field data for each object
+    return [
+      { field: 'Latitude', value: '29.3547', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+      { field: 'Longitude', value: '-89.6843', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+      { field: 'Status', value: 'Active', source: 'PRATUS', lastUpdated: '2025-11-15 14:03' },
+      { field: 'Signal Strength', value: '87%', source: 'CART', lastUpdated: '2025-11-15 14:05' }
+    ];
+  };
+
+  const getLayerObjects = (layerName: string): Array<{ name: string; lastUpdated: string }> => {
+    switch (layerName) {
+      case 'Radar Precipitation':
+        return [
+          { name: 'NEXRAD Station KHGX', lastUpdated: '2025-11-15 14:05' },
+          { name: 'NEXRAD Station KLCH', lastUpdated: '2025-11-15 14:04' },
+          { name: 'NEXRAD Station KLIX', lastUpdated: '2025-11-15 14:05' },
+          { name: 'Composite Mosaic', lastUpdated: '2025-11-15 14:05' }
+        ];
+      case 'Active Weather Warnings':
+        return [
+          { name: 'Gale Warning Zone 1', lastUpdated: '2025-11-15 13:45' },
+          { name: 'Gale Warning Zone 2', lastUpdated: '2025-11-15 13:50' },
+          { name: 'Small Craft Advisory Zone 3', lastUpdated: '2025-11-15 14:00' },
+          { name: 'Marine Weather Statement', lastUpdated: '2025-11-15 13:30' }
+        ];
+      case 'Staging Areas':
+        return [
+          { name: 'Staging Area Alpha', lastUpdated: '2025-11-15 13:40' },
+          { name: 'Staging Area Bravo', lastUpdated: '2025-11-15 13:35' },
+          { name: 'Staging Area Charlie', lastUpdated: '2025-11-15 13:30' }
+        ];
+      case 'Critical Facilities':
+        return [
+          { name: 'Water Treatment Plant #1', lastUpdated: '2025-11-15 12:00' },
+          { name: 'Emergency Operations Center', lastUpdated: '2025-11-15 12:00' },
+          { name: 'Hospital - Main Campus', lastUpdated: '2025-11-15 12:00' }
+        ];
+      case 'Boom Deployment Lines':
+        return [
+          { name: 'Boom Line Delta-1', lastUpdated: '2025-11-15 13:55' },
+          { name: 'Boom Line Delta-2', lastUpdated: '2025-11-15 13:50' },
+          { name: 'Boom Line Echo-1', lastUpdated: '2025-11-15 13:45' }
+        ];
+      case 'Skimmer Operations':
+        return [
+          { name: 'Skimmer Vessel-101', lastUpdated: '2025-11-15 13:50' },
+          { name: 'Skimmer Vessel-102', lastUpdated: '2025-11-15 13:48' },
+          { name: 'Skimmer Vessel-103', lastUpdated: '2025-11-15 13:45' }
+        ];
+      case 'Priority Protection Areas':
+        return [
+          { name: 'Coastal Wetland Zone A', lastUpdated: '2025-11-15 12:45' },
+          { name: 'Bird Nesting Area B', lastUpdated: '2025-11-15 12:45' },
+          { name: 'Oyster Beds C', lastUpdated: '2025-11-15 12:45' }
+        ];
+      case 'Boom Anchor Points':
+        return [
+          { name: 'Anchor Point AP-001', lastUpdated: '2025-11-15 12:20' },
+          { name: 'Anchor Point AP-002', lastUpdated: '2025-11-15 12:18' },
+          { name: 'Anchor Point AP-003', lastUpdated: '2025-11-15 12:15' }
+        ];
+      case 'AIS Vessel Tracks':
+        return [
+          { name: 'Vessel MV OCEAN RANGER', lastUpdated: '2025-11-15 14:05' },
+          { name: 'Vessel MV ATLANTIC PRIDE', lastUpdated: '2025-11-15 14:04' },
+          { name: 'Vessel MV COASTAL GUARDIAN', lastUpdated: '2025-11-15 14:03' }
+        ];
+      case 'Patrol Sectors':
+        return [
+          { name: 'Patrol Sector North', lastUpdated: '2025-11-15 13:25' },
+          { name: 'Patrol Sector South', lastUpdated: '2025-11-15 13:25' },
+          { name: 'Patrol Sector Central', lastUpdated: '2025-11-15 13:25' }
+        ];
+      default:
+        return [
+          { name: 'Object 1', lastUpdated: '2025-11-15 12:00' },
+          { name: 'Object 2', lastUpdated: '2025-11-15 12:00' }
+        ];
+    }
+  };
+
+  const getLayerFields = (layerName: string): Array<{ name: string; source: string }> => {
+    switch (layerName) {
+      case 'Radar Precipitation':
+        return [
+          { name: 'Reflectivity', source: 'CART' },
+          { name: 'Velocity', source: 'CART' },
+          { name: 'Storm Total Precipitation', source: 'PRATUS' },
+          { name: 'Echo Tops', source: 'PRATUS' }
+        ];
+      case 'Active Weather Warnings':
+        return [
+          { name: 'Warning Type', source: 'CART' },
+          { name: 'Severity Level', source: 'CART' },
+          { name: 'Issue Time', source: 'CART' },
+          { name: 'Expiration Time', source: 'CART' }
+        ];
+      case 'Staging Areas':
+        return [
+          { name: 'Location Name', source: 'CART' },
+          { name: 'Capacity', source: 'PRATUS' },
+          { name: 'Current Occupancy', source: 'PRATUS' },
+          { name: 'Operational Status', source: 'CART' }
+        ];
+      case 'Critical Facilities':
+        return [
+          { name: 'Facility Name', source: 'PRATUS' },
+          { name: 'Facility Type', source: 'PRATUS' },
+          { name: 'Priority Level', source: 'PRATUS' },
+          { name: 'Contact Information', source: 'PRATUS' }
+        ];
+      case 'Boom Deployment Lines':
+        return [
+          { name: 'Deployment ID', source: 'CART' },
+          { name: 'Length (meters)', source: 'CART' },
+          { name: 'Boom Type', source: 'CART' },
+          { name: 'Deployment Date', source: 'CART' }
+        ];
+      case 'Skimmer Operations':
+        return [
+          { name: 'Vessel ID', source: 'CART' },
+          { name: 'Operator', source: 'CART' },
+          { name: 'Recovery Rate', source: 'CART' },
+          { name: 'Operational Hours', source: 'CART' }
+        ];
+      case 'Priority Protection Areas':
+        return [
+          { name: 'Area Name', source: 'PRATUS' },
+          { name: 'Ecological Value', source: 'PRATUS' },
+          { name: 'Protection Strategy', source: 'PRATUS' },
+          { name: 'Access Restrictions', source: 'PRATUS' }
+        ];
+      case 'Boom Anchor Points':
+        return [
+          { name: 'Anchor ID', source: 'PRATUS' },
+          { name: 'Coordinates', source: 'PRATUS' },
+          { name: 'Anchor Type', source: 'PRATUS' },
+          { name: 'Installation Date', source: 'PRATUS' }
+        ];
+      case 'AIS Vessel Tracks':
+        return [
+          { name: 'Vessel Name', source: 'CART' },
+          { name: 'MMSI Number', source: 'CART' },
+          { name: 'Speed (knots)', source: 'PRATUS' },
+          { name: 'Heading', source: 'PRATUS' }
+        ];
+      case 'Patrol Sectors':
+        return [
+          { name: 'Sector ID', source: 'CART' },
+          { name: 'Patrol Unit', source: 'CART' },
+          { name: 'Shift Schedule', source: 'PRATUS' },
+          { name: 'Coverage Area', source: 'PRATUS' }
+        ];
+      default:
+        return [
+          { name: 'Field 1', source: 'CART' },
+          { name: 'Field 2', source: 'PRATUS' }
+        ];
+    }
+  };
+
   const getLayersForCategory = (category: string) => {
+    let baseLayers: Array<{ name: string; checked: boolean }> = [];
+    
     switch (category) {
       case 'weather':
-        return [
+        baseLayers = [
           { name: 'Radar Precipitation', checked: layerToggles.weather.radar },
           { name: 'Active Weather Warnings', checked: layerToggles.weather.warnings }
         ];
+        break;
       case 'resources':
-        return [
+        baseLayers = [
           { name: 'Staging Areas', checked: layerToggles.resources.staging },
           { name: 'Critical Facilities', checked: layerToggles.resources.facilities }
         ];
+        break;
       case 'tactics':
-        return [
+        baseLayers = [
           { name: 'Boom Deployment Lines', checked: layerToggles.tactics.booms },
           { name: 'Skimmer Operations', checked: layerToggles.tactics.skimmers }
         ];
+        break;
       case 'grs':
-        return [
+        baseLayers = [
           { name: 'Priority Protection Areas', checked: layerToggles.grs.priority },
           { name: 'Boom Anchor Points', checked: layerToggles.grs.anchor }
         ];
+        break;
       case 'vessels':
-        return [
+        baseLayers = [
           { name: 'AIS Vessel Tracks', checked: layerToggles.vessels.ais },
           { name: 'Patrol Sectors', checked: layerToggles.vessels.patrol }
         ];
+        break;
       default:
-        return [];
+        baseLayers = [];
     }
+    
+    // Add dynamically moved layers
+    const movedLayers = categoryLayers[category] || [];
+    const movedLayerObjects = movedLayers.map(name => ({ name, checked: true }));
+    
+    return [...baseLayers, ...movedLayerObjects];
   };
 
   const getCategoryDisplayName = (category: string) => {
@@ -108,38 +445,6 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
       case 'grs': return 'Geographic Response Strategies';
       case 'vessels': return 'Vessel Tracks';
       default: return '';
-    }
-  };
-
-  // Get nested objects for each layer
-  const getLayerObjects = (layerName: string): string[] => {
-    switch (layerName) {
-      case 'Radar Precipitation':
-        return ['NEXRAD Station KHGX', 'NEXRAD Station KLCH', 'NEXRAD Station KLIX', 'Composite Mosaic'];
-      case 'Active Weather Warnings':
-        return ['Gale Warning Zone 1', 'Gale Warning Zone 2', 'Small Craft Advisory Zone 3', 'Marine Weather Statement'];
-      case 'Staging Areas':
-        return ['Venice Launch Complex', 'Grand Isle Staging Base', 'Cocodrie Equipment Yard', 'Port Fourchon Logistics Hub'];
-      case 'Critical Facilities':
-        return ['MCBH Kaneohe Bay', 'Tesoro Hawaii Power Plant', 'Honolulu Water Treatment', 'Emergency Operations Center'];
-      case 'Boom Deployment Lines':
-        return ['Bayou Dularge Boom Line', 'Terrebonne Bay Containment', 'Timbalier Island Protection', 'Grand Isle Shoreline Boom'];
-      case 'Skimmer Operations':
-        return ['Skimmer Vessel Alpha-1', 'Skimmer Vessel Bravo-2', 'Skimmer Vessel Charlie-3', 'Recovery Platform Delta'];
-      case 'Open Action Items':
-        return ['Task 204-A: Boom Extension', 'Task 204-B: Wildlife Monitoring', 'Task 204-C: Equipment Procurement', 'Task 215-A: Shoreline Assessment'];
-      case 'Completed Action Items':
-        return ['Task 201-A: Initial Containment', 'Task 202-B: Unified Command Setup', 'Task 203-C: Personnel Mobilization'];
-      case 'Priority Protection Areas':
-        return ['Barataria Bay Wetlands', 'Timbalier Island Bird Sanctuary', 'Queen Bess Island Rookery', 'Coastal Marsh Critical Habitat'];
-      case 'Boom Anchor Points':
-        return ['Anchor Point A-1 (Bayou)', 'Anchor Point A-2 (Channel)', 'Anchor Point B-1 (Pass)', 'Anchor Point B-2 (Inlet)'];
-      case 'AIS Vessel Tracks':
-        return ['Commercial Traffic', 'Response Vessels', 'Fishing Vessels', 'Recreational Craft'];
-      case 'Patrol Sectors':
-        return ['Inner Harbor Patrol Zone', 'Outer Bay Patrol Zone', 'Channel Security Zone', 'Exclusion Zone Perimeter'];
-      default:
-        return ['Object 1', 'Object 2', 'Object 3'];
     }
   };
 
@@ -317,10 +622,169 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
             type="button"
             variant="outline"
             size="sm"
+            onClick={() => setAddLayerModalOpen(true)}
             className="h-[26px] px-3 bg-transparent border-border text-white hover:bg-muted/50"
           >
             + Add Layer
           </Button>
+        </div>
+        <div className="flex items-start gap-2 mt-3">
+          <div className="flex-1">
+            <Label className="text-white text-xs mb-1 block">Region</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-[26px] w-full justify-between bg-transparent border-border text-white text-xs hover:bg-muted/50"
+                >
+                  <span className="truncate">
+                    {regionFilter.length === 0 || regionFilter.length === 2
+                      ? 'All Regions'
+                      : regionFilter.length === 1
+                      ? regionFilter[0] === 'gulf-coast'
+                        ? 'Gulf Coast'
+                        : 'Mid-Atlantic'
+                      : `${regionFilter.length} selected`}
+                  </span>
+                  <ChevronDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[180px] p-0 bg-[#222529] border-[#6e757c]" align="start">
+                <Command className="bg-[#222529]">
+                  <CommandInput placeholder="Search..." className="h-8 text-white text-xs" />
+                  <CommandEmpty className="text-white/70 p-2 text-xs">No region found.</CommandEmpty>
+                  <CommandGroup className="max-h-[150px] overflow-auto">
+                    <CommandItem
+                      onSelect={() => {
+                        if (regionFilter.length === 2) {
+                          setRegionFilter([]);
+                        } else {
+                          setRegionFilter(['gulf-coast', 'mid-atlantic']);
+                        }
+                      }}
+                      className="text-white cursor-pointer text-xs font-semibold border-b border-border/30 mb-1"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <Checkbox
+                          checked={regionFilter.length === 2}
+                          className="pointer-events-none h-3 w-3"
+                        />
+                        <span>Select All</span>
+                      </div>
+                    </CommandItem>
+                    {[
+                      { value: 'gulf-coast', label: 'Gulf Coast Region' },
+                      { value: 'mid-atlantic', label: 'Mid-Atlantic Region' }
+                    ].map((region) => (
+                      <CommandItem
+                        key={region.value}
+                        onSelect={() => {
+                          setRegionFilter(prev =>
+                            prev.includes(region.value)
+                              ? prev.filter(v => v !== region.value)
+                              : [...prev, region.value]
+                          );
+                        }}
+                        className="text-white cursor-pointer text-xs"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <Checkbox
+                            checked={regionFilter.includes(region.value)}
+                            className="pointer-events-none h-3 w-3"
+                          />
+                          <span>{region.label}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex-1">
+            <Label className="text-white text-xs mb-1 block">Incident</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-[26px] w-full justify-between bg-transparent border-border text-white text-xs hover:bg-muted/50"
+                >
+                  <span className="truncate">
+                    {incidentFilter.length === 0 || incidentFilter.length === 6
+                      ? 'All Incidents'
+                      : incidentFilter.length === 1
+                      ? incidentFilter[0] === 'gulf-coast-pipeline'
+                        ? 'GC Pipeline'
+                        : incidentFilter[0] === 'bayou-dularge'
+                        ? 'Bayou Dularge'
+                        : incidentFilter[0] === 'estuarine-wildlife'
+                        ? 'Estuarine Wildlife'
+                        : incidentFilter[0] === 'delaware-river-tanker'
+                        ? 'DR Tanker'
+                        : incidentFilter[0] === 'port-terminal'
+                        ? 'Port Terminal'
+                        : 'DE Estuary'
+                      : `${incidentFilter.length} selected`}
+                  </span>
+                  <ChevronDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0 bg-[#222529] border-[#6e757c]" align="start">
+                <Command className="bg-[#222529]">
+                  <CommandInput placeholder="Search..." className="h-8 text-white text-xs" />
+                  <CommandEmpty className="text-white/70 p-2 text-xs">No incident found.</CommandEmpty>
+                  <CommandGroup className="max-h-[150px] overflow-auto">
+                    <CommandItem
+                      onSelect={() => {
+                        if (incidentFilter.length === 6) {
+                          setIncidentFilter([]);
+                        } else {
+                          setIncidentFilter(['gulf-coast-pipeline', 'bayou-dularge', 'estuarine-wildlife', 'delaware-river-tanker', 'port-terminal', 'delaware-estuary']);
+                        }
+                      }}
+                      className="text-white cursor-pointer text-xs font-semibold border-b border-border/30 mb-1"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <Checkbox
+                          checked={incidentFilter.length === 6}
+                          className="pointer-events-none h-3 w-3"
+                        />
+                        <span>Select All</span>
+                      </div>
+                    </CommandItem>
+                    {[
+                      { value: 'gulf-coast-pipeline', label: 'Gulf Coast Pipeline Spill' },
+                      { value: 'bayou-dularge', label: 'Bayou Dularge Contamination' },
+                      { value: 'estuarine-wildlife', label: 'Estuarine Wildlife Area Response' },
+                      { value: 'delaware-river-tanker', label: 'Delaware River Tanker Spill' },
+                      { value: 'port-terminal', label: 'Port Terminal Contamination' },
+                      { value: 'delaware-estuary', label: 'Delaware Estuary Shoreline Protection' }
+                    ].map((incident) => (
+                      <CommandItem
+                        key={incident.value}
+                        onSelect={() => {
+                          setIncidentFilter(prev =>
+                            prev.includes(incident.value)
+                              ? prev.filter(v => v !== incident.value)
+                              : [...prev, incident.value]
+                          );
+                        }}
+                        className="text-white cursor-pointer text-xs"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <Checkbox
+                            checked={incidentFilter.includes(incident.value)}
+                            className="pointer-events-none h-3 w-3"
+                          />
+                          <span>{incident.label}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2">
@@ -365,7 +829,7 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
         </div>
 
         {/* Weather */}
-        <div
+        {shouldShowCategory(['Radar Precipitation', 'Active Weather Warnings']) && <div
           className="border border-border rounded-lg overflow-hidden"
           style={{
             background:
@@ -471,6 +935,12 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 14:05 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
+                      Region: Gulf Coast Region
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
                       Type: data layer
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
@@ -527,20 +997,26 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 14:02 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: CART
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Resources */}
-        <div
+        {shouldShowCategory(['Staging Areas', 'Critical Facilities']) && <div
           className="border border-border rounded-lg overflow-hidden"
           style={{
             background:
@@ -646,10 +1122,16 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 13:40 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: CART, PRATUS
                     </div>
                   </div>
                 )}
@@ -702,20 +1184,26 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 12:00 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Mid-Atlantic Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Delaware River Tanker Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: PRATUS
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Tactics */}
-        <div
+        {shouldShowCategory(['Boom Deployment Lines', 'Skimmer Operations']) && <div
           className="border border-border rounded-lg overflow-hidden"
           style={{
             background:
@@ -828,10 +1316,16 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 13:55 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: CART
                     </div>
                   </div>
                 )}
@@ -893,20 +1387,26 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 13:50 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: CART
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Geographic Response Strategies */}
-        <div
+        {shouldShowCategory(['Priority Protection Areas', 'Boom Anchor Points']) && <div
           className="border border-border rounded-lg overflow-hidden"
           style={{
             background:
@@ -1012,10 +1512,16 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 12:45 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: PRATUS
                     </div>
                   </div>
                 )}
@@ -1068,20 +1574,26 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 12:20 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: feature layer
+                      Region: Gulf Coast Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Gulf Coast Pipeline Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: PRATUS
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Vessel Tracks */}
-        <div
+        {shouldShowCategory(['AIS Vessel Tracks', 'Patrol Sectors']) && <div
           className="border border-border rounded-lg overflow-hidden"
           style={{
             background:
@@ -1194,6 +1706,12 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 14:05 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
+                      Region: Mid-Atlantic Region
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Incident: Delaware River Tanker Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
                       Type: data layer
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
@@ -1259,17 +1777,23 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                       Last Updated: 2025-11-15 13:25 UTC
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Type: web map
+                      Region: Mid-Atlantic Region
                     </div>
                     <div className="text-sm leading-none text-white mt-3">
-                      Sources: FSLTP
+                      Incident: Delaware River Tanker Spill
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Type: data layer
+                    </div>
+                    <div className="text-sm leading-none text-white mt-3">
+                      Sources: CART, PRATUS
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
       </CardContent>
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
         <DialogContent className="text-white">
@@ -1309,48 +1833,150 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
               {layerModalCategory ? getCategoryDisplayName(layerModalCategory) : 'Layers'}
             </DialogTitle>
             <DialogDescription className="text-white/70">
-              All layers in this category
+              Layers
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 mt-4">
-            {layerModalCategory && getLayersForCategory(layerModalCategory).map((layer, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 border border-border/30 rounded-md bg-card/30"
-              >
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={layer.checked} disabled />
-                  <span className="text-sm text-white">{layer.name}</span>
-                </div>
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{
-                    backgroundColor: layer.checked ? '#22c55e' : '#6e757c',
-                    border: '1px solid rgba(255,255,255,0.6)'
-                  }}
-                  title={layer.checked ? 'Active' : 'Inactive'}
-                />
-              </div>
-            ))}
+          <div className="space-y-4 mt-4">
+            {/* Existing layers in category */}
+            <div className="space-y-3">
+              {layerModalCategory && getLayersForCategory(layerModalCategory).map((layer, idx) => {
+                const isExpanded = expandedModalLayers.has(layer.name);
+                return (
+                  <div
+                    key={idx}
+                    className="border border-border/30 rounded-md bg-card/30"
+                  >
+                    {/* Layer header */}
+                    <div
+                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/20"
+                      onClick={() => toggleModalLayer(layer.name)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-white" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-white" />
+                        )}
+                        <span className="text-sm text-white">{layer.name}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Layer details */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-2 text-xs">
+                        <div className="flex justify-between border-t border-border/30 pt-2">
+                          <span className="text-white/70">Last Updated</span>
+                          <span className="text-white">2025-11-15 14:05</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Region</span>
+                          <span className="text-white">{getLayerRegion(layer.name) === 'gulf-coast' ? 'Gulf Coast Region' : getLayerRegion(layer.name) === 'mid-atlantic' ? 'Mid-Atlantic Region' : 'All Regions'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Incident</span>
+                          <span className="text-white">
+                            {getLayerIncident(layer.name) === 'gulf-coast-pipeline' ? 'Gulf Coast Pipeline Spill' :
+                             getLayerIncident(layer.name) === 'bayou-dularge' ? 'Bayou Dularge Contamination' :
+                             getLayerIncident(layer.name) === 'estuarine-wildlife' ? 'Estuarine Wildlife Area Response' :
+                             getLayerIncident(layer.name) === 'delaware-river-tanker' ? 'Delaware River Tanker Spill' :
+                             getLayerIncident(layer.name) === 'port-terminal' ? 'Port Terminal Contamination' :
+                             getLayerIncident(layer.name) === 'delaware-estuary' ? 'Delaware Estuary Shoreline Protection' :
+                             'All Incidents'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Type</span>
+                          <span className="text-white">data layer</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/70">Sources</span>
+                          <span className="text-white">CART, PRATUS</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Add layer to category */}
+            <div className="border-t border-border/30 pt-4">
+              <Label className="text-white text-sm mb-2 block">Move Layer to Category</Label>
+              <Popover open={addLayerSearchOpen} onOpenChange={setAddLayerSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between bg-transparent border-border text-white text-sm hover:bg-muted/50"
+                  >
+                    <span>
+                      {selectedLayersToMove.length === 0 
+                        ? 'Select layers...' 
+                        : `${selectedLayersToMove.length} layer${selectedLayersToMove.length > 1 ? 's' : ''} selected`}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0 bg-[#222529] border-[#6e757c]" align="start">
+                  {/* Move button at top */}
+                  {selectedLayersToMove.length > 0 && (
+                    <div className="p-2 border-b border-border/30">
+                      <Button
+                        onClick={moveLayersToCategory}
+                        className="w-full bg-[#01669f] hover:bg-[#01669f]/90 text-white"
+                      >
+                        Move {selectedLayersToMove.length} Layer{selectedLayersToMove.length > 1 ? 's' : ''}
+                      </Button>
+                    </div>
+                  )}
+                  <Command className="bg-[#222529]">
+                    <CommandInput placeholder="Search layers..." className="h-9 text-white text-sm" />
+                    <CommandEmpty className="text-white/70 p-3 text-sm">No layer found.</CommandEmpty>
+                    <CommandGroup className="max-h-[200px] overflow-auto">
+                      {getAllLayers().map((layer) => (
+                        <CommandItem
+                          key={layer}
+                          onSelect={() => {
+                            setSelectedLayersToMove(prev =>
+                              prev.includes(layer)
+                                ? prev.filter(l => l !== layer)
+                                : [...prev, layer]
+                            );
+                          }}
+                          className="text-white cursor-pointer text-sm"
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            <Checkbox
+                              checked={selectedLayersToMove.includes(layer)}
+                              className="pointer-events-none h-3 w-3"
+                            />
+                            <span>{layer}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
       
       {/* Individual Layer Modal */}
       <Dialog open={individualLayerModalOpen} onOpenChange={setIndividualLayerModalOpen}>
-        <DialogContent className="bg-[#222529] border-[#6e757c] text-white max-w-md">
+        <DialogContent className="bg-[#222529] border-[#6e757c] text-white" style={{ maxWidth: '1008px' }}>
           <DialogHeader>
             <DialogTitle className="text-white">
               {selectedIndividualLayer || 'Layer Details'}
             </DialogTitle>
             <DialogDescription className="text-white/70">
-              Layer information and metadata
+              Layer Details
             </DialogDescription>
           </DialogHeader>
           {selectedIndividualLayer && (() => {
             const presets: Record<
               string,
-              { source: string; owner: string; created: string; lastUpdated: string; timezone: string; frequency: string; type: string }
+              { source: string; owner: string; created: string; lastUpdated: string; timezone: string; frequency: string; type: string; region: string; incident: string }
             > = {
               'Radar Precipitation': {
                 source: 'NOAA NEXRAD Composite',
@@ -1359,7 +1985,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 14:05',
                 timezone: 'UTC',
                 frequency: 'Every 5 minutes',
-                type: 'data layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Gulf Coast Pipeline Spill'
               },
               'Active Weather Warnings': {
                 source: 'NOAA Weather Alerts (CAP)',
@@ -1368,7 +1996,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 14:02',
                 timezone: 'UTC',
                 frequency: 'Real-time',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Gulf Coast Pipeline Spill'
               },
               'Staging Areas': {
                 source: 'Incident Logistics GIS (IMS)',
@@ -1377,7 +2007,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 13:40',
                 timezone: 'UTC',
                 frequency: 'Hourly',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Bayou Dularge Contamination'
               },
               'Critical Facilities': {
                 source: 'State Infrastructure GIS',
@@ -1386,7 +2018,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 12:00',
                 timezone: 'UTC',
                 frequency: 'Daily',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Mid-Atlantic Region',
+                incident: 'Delaware River Tanker Spill'
               },
               'Boom Deployment Lines': {
                 source: 'Operations Section (Field Mapping)',
@@ -1395,7 +2029,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 13:55',
                 timezone: 'UTC',
                 frequency: 'Ad hoc (as reported)',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Bayou Dularge Contamination'
               },
               'Skimmer Operations': {
                 source: 'Operations Section (Marine)',
@@ -1404,7 +2040,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 13:50',
                 timezone: 'UTC',
                 frequency: 'Ad hoc (as reported)',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Estuarine Wildlife Area Response'
               },
               'Priority Protection Areas': {
                 source: 'Environmental Unit (GRP/GRS)',
@@ -1413,7 +2051,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 12:45',
                 timezone: 'UTC',
                 frequency: 'Daily',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Estuarine Wildlife Area Response'
               },
               'Boom Anchor Points': {
                 source: 'Environmental Unit (Field Survey)',
@@ -1422,7 +2062,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 12:20',
                 timezone: 'UTC',
                 frequency: 'Ad hoc (as surveyed)',
-                type: 'feature layer'
+                type: 'data layer',
+                region: 'Gulf Coast Region',
+                incident: 'Estuarine Wildlife Area Response'
               },
               'AIS Vessel Tracks': {
                 source: 'AIS Feed (USCG / Commercial AIS)',
@@ -1431,7 +2073,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 14:05',
                 timezone: 'UTC',
                 frequency: 'Every minute',
-                type: 'data layer'
+                type: 'data layer',
+                region: 'Mid-Atlantic Region',
+                incident: 'Port Terminal Contamination'
               },
               'Patrol Sectors': {
                 source: 'USCG Sector Command',
@@ -1440,7 +2084,9 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
                 lastUpdated: '2025-11-15 13:25',
                 timezone: 'UTC',
                 frequency: 'Per shift',
-                type: 'web map'
+                type: 'data layer',
+                region: 'Mid-Atlantic Region',
+                incident: 'Delaware Estuary Shoreline Protection'
               }
             };
             const meta = presets[selectedIndividualLayer] ?? {
@@ -1450,38 +2096,264 @@ export function DataLayers({ className, style, orientation = 'vertical', onHandl
               lastUpdated: 'N/A',
               timezone: 'UTC',
               frequency: 'N/A',
-              type: 'data layer'
+              type: 'data layer',
+              region: 'N/A',
+              incident: 'N/A'
             };
             
             return (
-              <div className="space-y-3 mt-4">
-                <div className="flex items-center justify-between p-2 border-b border-border/30">
-                  <span className="text-sm text-white/70">Data Source</span>
-                  <span className="text-sm text-white">{meta.source}</span>
+              <div className="mt-4 space-y-3">
+                <Table>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Data Source</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.source}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Data Owner</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.owner}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Created</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.created}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Last Updated</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.lastUpdated} ({meta.timezone})</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Region</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.region}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Incident</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.incident}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2">Type</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right">{meta.type}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-sm text-white/70 p-2 border-b-0">Update Frequency</TableCell>
+                      <TableCell className="text-sm text-white p-2 text-right border-b-0">{meta.frequency}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                
+                {/* Objects Section */}
+                <div className="mt-4">
+                  <p className="text-xs text-white/70 mb-3">Objects</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Input
+                      type="text"
+                      placeholder="Search objects..."
+                      value={objectSearchTerm}
+                      onChange={(e) => setObjectSearchTerm(e.target.value)}
+                      className="flex-1 bg-[#1a1d21] border-border text-white"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-transparent border-border text-white hover:bg-muted/50 whitespace-nowrap"
+                    >
+                      + Add Object
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    {getLayerObjects(selectedIndividualLayer)
+                      .slice(0, 2)
+                      .filter(obj => obj.name.toLowerCase().includes(objectSearchTerm.toLowerCase()))
+                      .map((obj, idx) => {
+                    const isExpanded = expandedObjects.has(obj.name);
+                    return (
+                      <div
+                        key={idx}
+                        className="border border-border rounded-lg overflow-hidden"
+                        style={{
+                          background:
+                            'linear-gradient(90deg, rgba(2, 163, 254, 0.08) 0%, rgba(0, 0, 0, 0) 100%), linear-gradient(90deg, rgb(20, 23, 26) 0%, rgb(20, 23, 26) 100%)'
+                        }}
+                      >
+                        <div 
+                          className="p-3 cursor-pointer hover:bg-muted/10"
+                          onClick={() => toggleObject(obj.name)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-white flex-shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-white flex-shrink-0" />
+                              )}
+                              <span className="text-white">{obj.name}</span>
+                            </div>
+                            <span className="text-xs text-white/50">Last updated: {obj.lastUpdated}</span>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="border-t border-border/30 p-3">
+                            <Table>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell className="text-sm font-medium text-white/70 p-2">Field</TableCell>
+                                  <TableCell className="text-sm font-medium text-white/70 p-2">Value</TableCell>
+                                  <TableCell className="text-sm font-medium text-white/70 p-2">Source</TableCell>
+                                  <TableCell className="text-sm font-medium text-white/70 p-2">Last Updated</TableCell>
+                                </TableRow>
+                                {getObjectFields(obj.name).map((field, fieldIdx) => (
+                                  <TableRow key={fieldIdx}>
+                                    <TableCell className="text-sm text-white p-2">{field.field}</TableCell>
+                                    <TableCell className="text-sm text-white p-2">{field.value}</TableCell>
+                                    <TableCell className="text-sm text-white p-2">{field.source}</TableCell>
+                                    <TableCell className="text-sm text-white p-2">{field.lastUpdated}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between p-2 border-b border-border/30">
-                  <span className="text-sm text-white/70">Data Owner</span>
-                  <span className="text-sm text-white">{meta.owner}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 border-b border-border/30">
-                  <span className="text-sm text-white/70">Created</span>
-                  <span className="text-sm text-white">{meta.created}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 border-b border-border/30">
-                  <span className="text-sm text-white/70">Last Updated</span>
-                  <span className="text-sm text-white">{meta.lastUpdated} ({meta.timezone})</span>
-                </div>
-                <div className="flex items-center justify-between p-2 border-b border-border/30">
-                  <span className="text-sm text-white/70">Type</span>
-                  <span className="text-sm text-white">{meta.type}</span>
-                </div>
-                <div className="flex items-center justify-between p-2">
-                  <span className="text-sm text-white/70">Update Frequency</span>
-                  <span className="text-sm text-white">{meta.frequency}</span>
+                
+                {/* Fields Section */}
+                <div className="border border-border/30 rounded-md overflow-hidden mt-3">
+                  <div 
+                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/10"
+                    onClick={() => setFieldsExpanded(!fieldsExpanded)}
+                  >
+                    <span className="text-sm font-medium text-white">Fields</span>
+                    {fieldsExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-white" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  {fieldsExpanded && (
+                    <div className="border-t border-border/30">
+                      <Table>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="text-sm font-medium text-white/70 p-2">Field</TableCell>
+                            <TableCell className="text-sm font-medium text-white/70 p-2 text-right">Source</TableCell>
+                          </TableRow>
+                          {getLayerFields(selectedIndividualLayer).map((field, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-sm text-white p-2">{field.name}</TableCell>
+                              <TableCell className="text-sm text-white p-2 text-right">{field.source}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Layer Modal */}
+      <Dialog open={addLayerModalOpen} onOpenChange={setAddLayerModalOpen}>
+        <DialogContent className="bg-[#222529] border-[#6e757c] text-white" style={{ maxWidth: '672px' }}>
+          <DialogHeader>
+            <DialogTitle className="text-white">Add Layer</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            {/* Toggle between Upload and Draw */}
+            <div className="flex w-full border border-border bg-[#1a1d21] rounded-md overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setAddLayerMode('upload')}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                  addLayerMode === 'upload'
+                    ? 'bg-[#01669f] text-white'
+                    : 'bg-transparent text-foreground hover:bg-muted/50'
+                }`}
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddLayerMode('draw')}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors border-l border-border ${
+                  addLayerMode === 'draw'
+                    ? 'bg-[#01669f] text-white'
+                    : 'bg-transparent text-foreground hover:bg-muted/50'
+                }`}
+              >
+                Draw Layer
+              </button>
+            </div>
+
+            {/* Content area */}
+            <div className="p-8 border border-border/30 rounded-md bg-card/30">
+              <p className="text-center text-white/70">
+                {addLayerMode === 'upload' ? '[Upload File Placeholder]' : '[Draw Layer Placeholder]'}
+              </p>
+            </div>
+
+            {/* Layer Category Dropdown */}
+            <div>
+              <Label className="text-white text-xs mb-1 block">Layer Category</Label>
+              <Popover open={categoryDropdownOpen} onOpenChange={setCategoryDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={categoryDropdownOpen}
+                    className="w-full justify-between bg-[#1a1d21] border-border text-white hover:bg-muted/50"
+                  >
+                    {addLayerCategory}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[624px] p-0 bg-[#1a1d21] border-border" align="start">
+                  <Command className="bg-[#1a1d21]">
+                    <CommandInput 
+                      placeholder="Search categories..." 
+                      className="bg-[#1a1d21] text-white border-none"
+                    />
+                    <CommandList>
+                      <CommandEmpty className="text-white/70 py-6 text-center text-sm">
+                        No category found.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {[
+                          'No Category',
+                          'My ArcGIS',
+                          'Weather',
+                          'Resources',
+                          'Tactics',
+                          'Geographic Response Strategies'
+                        ].map((category) => (
+                          <CommandItem
+                            key={category}
+                            value={category}
+                            onSelect={() => {
+                              setAddLayerCategory(category);
+                              setCategoryDropdownOpen(false);
+                            }}
+                            className="text-white hover:bg-muted/50"
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                addLayerCategory === category ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                            {category}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

@@ -549,18 +549,6 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
                     >
                       <RefreshCw className="w-3 h-3 text-white" />
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openEditSource(source.id); }}
-                      className="p-1 hover:bg-muted/30 rounded transition-colors"
-                    >
-                      <Edit2 className="w-3 h-3 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteSource(source.id); }}
-                      className="p-1 hover:bg-muted/30 rounded transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3 text-white" />
-                    </button>
                   </div>
                 </div>
               </div>
