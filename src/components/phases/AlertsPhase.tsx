@@ -194,6 +194,18 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
     return `${d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
   };
 
+  const formatMilitaryTimeUTC = (iso?: string) => {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const hours = String(d.getUTCHours()).padStart(2, '0');
+    const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${month}/${day}/${year} ${hours}:${minutes} UTC`;
+  };
+
   const persist = (items: AlertItem[]) => {
     setAlerts(items);
     onDataChange({ ...data, alerts: items });
@@ -265,7 +277,7 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
     const s = searchTerm.toLowerCase();
     return (
       a.title.toLowerCase().includes(s) ||
-      a.source.toLowerCase().includes(s) ||
+      (a.sentBy && a.sentBy.toLowerCase().includes(s)) ||
       a.severity.toLowerCase().includes(s) ||
       a.status.toLowerCase().includes(s)
     );
@@ -352,12 +364,12 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                       <span className="caption text-white">{a.title}</span>
                       {!isExpanded && (
                         <div className="flex items-center gap-3 mt-1">
-                          <span className="caption text-white">{a.source}</span>
+                          <span className="caption text-white">{a.sentBy}</span>
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: severityColor(a.severity) }} />
                             <span className="caption" style={{ color: severityColor(a.severity) }}>{a.severity}</span>
                           </div>
-                          <span className="caption text-white">{a.status}</span>
+                          <span className="caption text-white">{formatMilitaryTimeUTC(a.timeSent)}</span>
                         </div>
                       )}
                     </div>
@@ -376,18 +388,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                       title="Zoom to alert location"
                     >
                       <Map className="w-3 h-3 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openEditAlert(a.id); }}
-                      className="p-1 hover:bg-muted/30 rounded transition-colors"
-                    >
-                      <Edit2 className="w-3 h-3 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteAlert(a.id); }}
-                      className="p-1 hover:bg-muted/30 rounded transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3 text-white" />
                     </button>
                   </div>
                 </div>
