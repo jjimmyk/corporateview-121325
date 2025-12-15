@@ -494,11 +494,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
         <SheetContent side="right" className="w-full sm:max-w-[640px] bg-card overflow-y-auto px-6">
           <SheetHeader>
             <SheetTitle>{editingAlertId ? 'Edit Alert' : 'Schedule Alert'}</SheetTitle>
-            <SheetDescription>
-              {editingAlertId 
-                ? 'Update the alert message, recipients, and delivery settings.' 
-                : 'Create a new alert to be sent to selected recipients at a specified time over chosen communication channels.'}
-            </SheetDescription>
           </SheetHeader>
 
           <div className="mt-6 space-y-6 pb-6">
@@ -646,9 +641,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                   )}
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Select individuals and/or teams to receive this alert.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -688,13 +680,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                   />
                 </div>
               )}
-              
-              <p className="text-xs text-muted-foreground">
-                {sendTimingMode === 'now' 
-                  ? 'Alert will be sent immediately upon creation'
-                  : 'Select when this alert should be sent to recipients'
-                }
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -717,9 +702,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Select one or more channels to send the alert through
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -745,9 +727,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                 placeholder="Enter location..."
                 className="bg-input-background border-border" 
               />
-              <p className="text-xs text-muted-foreground">
-                Specify the geographic area or location where this alert applies
-              </p>
             </div>
 
             <div className="space-y-2">
