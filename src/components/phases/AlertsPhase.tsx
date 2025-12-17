@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -109,6 +109,25 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
   
   // State for send timing mode
   const [sendTimingMode, setSendTimingMode] = useState<'now' | 'scheduled'>('scheduled');
+
+  // State for keep message same across channels
+  const [keepMessageSame, setKeepMessageSame] = useState(true);
+  
+  // State for active message tab
+  const [activeMessageTab, setActiveMessageTab] = useState<string>('');
+  
+  // State for channel-specific messages
+  const [channelMessages, setChannelMessages] = useState<Record<string, string>>({});
+
+  // Set active tab when channels change
+  useEffect(() => {
+    if (formData.channels && formData.channels.length > 0) {
+      // Set to first channel if no active tab or active tab is not in selected channels
+      if (!activeMessageTab || !formData.channels.includes(activeMessageTab)) {
+        setActiveMessageTab(formData.channels[0]);
+      }
+    }
+  }, [formData.channels, activeMessageTab]);
 
   // Available communication channels
   const communicationChannels = [
@@ -497,15 +516,135 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
           </SheetHeader>
 
           <div className="mt-6 space-y-6 pb-6">
+            {/* Communication Channels */}
             <div className="space-y-2">
+              <Label className="text-foreground">Communication Channels <span className="text-destructive">*</span></Label>
+              <div className="flex flex-wrap gap-3">
+                {communicationChannels.map((channel) => {
+                  const isSelected = formData.channels?.includes(channel.id);
+                  return (
+                    <label
+                      key={channel.id}
+                      className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg border border-border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#01476f]'
+                          : 'hover:bg-muted/20'
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleChannel(channel.id)}
+                      />
+                      
+                      {/* Icon */}
+                      <div className="w-6 h-6 flex items-center justify-center">
+                        {channel.id === 'email' && (
+                          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="white"/>
+                          </svg>
+                        )}
+                        {channel.id === 'sms' && (
+                          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 11H7V9h2v2zm4 0h-2V9h2v2zm4 0h-2V9h2v2z" fill="white"/>
+                          </svg>
+                        )}
+                        {channel.id === 'push' && (
+                          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" fill="white"/>
+                          </svg>
+                        )}
+                        {channel.id === 'voice' && (
+                          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="white"/>
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-white text-xs font-semibold whitespace-nowrap">
+                        {channel.label}
+                      </span>
+                      {/* Info icon */}
+                      <div className="w-2.5 h-2.5 bg-white/50 rounded-full"></div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {/* Keep message same checkbox */}
+              <div className="flex items-center gap-2 pb-2">
+                <Checkbox
+                  id="keep-message-same"
+                  checked={keepMessageSame}
+                  onCheckedChange={(checked) => setKeepMessageSame(checked as boolean)}
+                  className="border-border"
+                />
+                <label
+                  htmlFor="keep-message-same"
+                  className="text-sm cursor-pointer text-foreground"
+                >
+                  Keep message the same across all channels
+                </label>
+              </div>
+              
               <Label className="text-foreground">Alert Message <span className="text-destructive">*</span></Label>
-              <Textarea 
-                value={formData.title} 
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
-                placeholder="Enter alert message..."
-                rows={3}
-                className="bg-input-background border-border resize-none" 
-              />
+              
+              {/* Show tabs when channels are selected */}
+              {formData.channels && formData.channels.length > 0 && (
+                <div className="flex gap-2 mb-3">
+                  {formData.channels.map((channelId) => {
+                    const channel = communicationChannels.find(c => c.id === channelId);
+                    if (!channel) return null;
+                    return (
+                      <button
+                        key={channelId}
+                        type="button"
+                        onClick={() => setActiveMessageTab(channelId)}
+                        className={`px-4 py-2 text-sm font-medium transition-colors rounded ${
+                          activeMessageTab === channelId
+                            ? 'bg-accent text-white'
+                            : 'text-white hover:bg-muted/20'
+                        }`}
+                      >
+                        {channel.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Message field - shared or channel-specific */}
+              {formData.channels && formData.channels.length > 0 ? (
+                keepMessageSame ? (
+                  <Textarea 
+                    value={formData.title} 
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                    placeholder="Enter alert message (will be sent to all selected channels)..."
+                    rows={3}
+                    className="bg-input-background border-border resize-none" 
+                  />
+                ) : (
+                  formData.channels.map((channelId) => {
+                    const channel = communicationChannels.find(c => c.id === channelId);
+                    if (!channel || activeMessageTab !== channelId) return null;
+                    return (
+                      <Textarea
+                        key={channelId}
+                        value={channelMessages[channelId] || ''}
+                        onChange={(e) => setChannelMessages(prev => ({ ...prev, [channelId]: e.target.value }))}
+                        placeholder={`Enter custom message for ${channel.label}...`}
+                        rows={3}
+                        className="bg-input-background border-border resize-none"
+                      />
+                    );
+                  })
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground p-3 border border-border rounded bg-input-background">
+                  Please select at least one communication channel above to compose your message.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -680,28 +819,6 @@ export function AlertsPhase({ data, onDataChange, onZoomToLocation, onAddAIConte
                   />
                 </div>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-foreground">Communication Channels <span className="text-destructive">*</span></Label>
-              <div className="border border-border rounded-md p-3 bg-input-background space-y-3">
-                {communicationChannels.map((channel) => (
-                  <div key={channel.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={channel.id}
-                      checked={formData.channels?.includes(channel.id)}
-                      onCheckedChange={() => toggleChannel(channel.id)}
-                      className="border-border"
-                    />
-                    <label
-                      htmlFor={channel.id}
-                      className="text-sm cursor-pointer"
-                    >
-                      {channel.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div className="space-y-2">

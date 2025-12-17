@@ -37,6 +37,7 @@ interface DataSourceItem {
 export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPhaseProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
+  const [expandedChildIncidents, setExpandedChildIncidents] = useState<Set<string>>(new Set());
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'region' | 'incident'>('region');
@@ -44,6 +45,15 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
   const [selectedIncident, setSelectedIncident] = useState<string>('oil-spill-alpha');
   const [regionPopoverOpen, setRegionPopoverOpen] = useState(false);
   const [incidentPopoverOpen, setIncidentPopoverOpen] = useState(false);
+  const [sitrepContent, setSitrepContent] = useState<string>(data.sitrep || '');
+  const [sitrepEditMode, setSitrepEditMode] = useState(false);
+  const [sitrepDraft, setSitrepDraft] = useState<string>('');
+  const [sitrepLastUpdated, setSitrepLastUpdated] = useState<string>(data.sitrepLastUpdated || '');
+  const [sitrepLastUpdatedBy, setSitrepLastUpdatedBy] = useState<string>(data.sitrepLastUpdatedBy || 'John Smith');
+  const [filterEditMode, setFilterEditMode] = useState(false);
+  const [filterModeDraft, setFilterModeDraft] = useState<'region' | 'incident'>('region');
+  const [selectedRegionDraft, setSelectedRegionDraft] = useState<string>('gulf-coast');
+  const [selectedIncidentDraft, setSelectedIncidentDraft] = useState<string>('oil-spill-alpha');
 
   // Region options
   const regions = [
@@ -51,7 +61,8 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
     { id: 'southeast', name: 'Southeast Region' },
     { id: 'northeast', name: 'Northeast Region' },
     { id: 'west-coast', name: 'West Coast Region' },
-    { id: 'great-lakes', name: 'Great Lakes Region' }
+    { id: 'great-lakes', name: 'Great Lakes Region' },
+    { id: 'sector-new-york', name: 'Sector New York' }
   ];
 
   // Incident options
@@ -64,14 +75,110 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
   ];
 
   // Function to generate data based on region and incident
-  const generateDataForSelection = (region: string, incident: string): DataSourceItem[] => {
+  const generateDataForSelection = (region: string, incident: string, mode: 'region' | 'incident' = 'region'): DataSourceItem[] => {
     const baseTime = new Date();
     const randomMinutes = () => Math.floor(Math.random() * 15);
     
     const regionCoverage = regions.find(r => r.id === region)?.name || 'Unknown Region';
     const incidentName = incidents.find(i => i.id === incident)?.name || 'Unknown Incident';
     
-    return [
+    const items: DataSourceItem[] = [];
+    
+    // Add Active Incidents item only when filtering by region
+    if (mode === 'region') {
+      items.push({
+        id: 'src0',
+        name: `Active Incidents Within ${regionCoverage}`,
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Real-time',
+        provider: 'Integrated Emergency Management System',
+        description: `Comprehensive list of all active emergency incidents and responses within ${regionCoverage}. Includes incident type, severity, status, responding agencies, affected areas, resource allocation, and operational priorities. Provides regional situational awareness across all concurrent emergency operations.`,
+        dataTypes: ['Incident Type', 'Severity Level', 'Status', 'Location', 'Responding Agencies', 'Resources Deployed'],
+        coverage: regionCoverage,
+        reliability: '99.9% uptime',
+        dataSources: 'FEMA IPAWS, State EOC, Local Emergency Dispatch, USCG Command Centers, DHS NIMS'
+      });
+    }
+    
+    items.push(
+      {
+        id: 'src0a',
+        name: 'Port Status',
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Every 30 minutes',
+        provider: 'U.S. Coast Guard Captain of the Port',
+        description: `Port operational status for ${regionCoverage}: Open (with restrictions) or Closed. Includes berth availability, channel restrictions, pilot services, tug requirements, and maritime traffic management for ${incidentName}.`,
+        dataTypes: ['Port Condition', 'Channel Status', 'Berth Availability', 'Vessel Traffic', 'Restrictions'],
+        coverage: regionCoverage,
+        reliability: '99.9% uptime',
+        dataSources: 'USCG Sector Command Center, Homeport, Port Authority, Marine Exchange'
+      },
+      {
+        id: 'src0b',
+        name: 'HURCON Attainment',
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Every 6 hours',
+        provider: 'U.S. Coast Guard',
+        description: `Hurricane Condition (HURCON) readiness level for ${regionCoverage} facilities and units. Tracks progression through HURCON 5 (96 hours), HURCON 4 (72 hours), HURCON 3 (48 hours), HURCON 2 (24 hours), to HURCON 1 (12 hours) relative to ${incidentName}.`,
+        dataTypes: ['HURCON Level', 'Readiness Status', 'Timeline', 'Resource Positioning', 'Evacuation Status'],
+        coverage: regionCoverage,
+        reliability: '99.9% uptime',
+        dataSources: 'USCG District Command, Sector Operations Centers, Unit Commanders'
+      },
+      {
+        id: 'src0c',
+        name: 'Port Condition Status',
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Every 2 hours',
+        provider: 'U.S. Coast Guard Sector',
+        description: `Comprehensive port readiness condition for ${regionCoverage}. Includes X-RAY (normal operations), YANKEE (heavy weather/high winds expected), ZULU (port closed/severe conditions) designations affecting ${incidentName} maritime operations and emergency response.`,
+        dataTypes: ['Port Condition', 'Weather Impact', 'Facility Status', 'Safety Measures', 'Operational Restrictions'],
+        coverage: regionCoverage,
+        reliability: '99.9% uptime',
+        dataSources: 'USCG Captain of the Port, National Weather Service, Port Operations'
+      },
+      {
+        id: 'src0d',
+        name: 'COOP Status',
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Every 12 hours',
+        provider: 'FEMA/DHS',
+        description: `Continuity of Operations (COOP) planning status for ${regionCoverage} critical facilities and government operations. Tracks essential functions, alternate facility activation, personnel accountability, communications redundancy, and resource sustainability for ${incidentName} response.`,
+        dataTypes: ['COOP Level', 'Essential Functions', 'Alternate Facilities', 'Personnel Status', 'Communications'],
+        coverage: regionCoverage,
+        reliability: '99.8% uptime',
+        dataSources: 'Federal Emergency Operations, State EOC, Local Emergency Management, Agency COOP Coordinators'
+      },
+      {
+        id: 'src0e',
+        name: 'Force Layout',
+        status: 'Active',
+        lastUpdated: new Date(baseTime.getTime() - randomMinutes() * 60000).toLocaleString('en-US', { 
+          year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+        }).replace(',', ''),
+        updateFrequency: 'Every 4 hours',
+        provider: 'U.S. Coast Guard/DoD',
+        description: `Pre-staged emergency response assets for ${regionCoverage} including helicopters, fixed-wing aircraft, Catastrophic Incident Search and Rescue (CISAR) teams, unmanned aerial systems (drones), swift water rescue teams, and specialized equipment positioned for rapid deployment to ${incidentName} impact area.`,
+        dataTypes: ['Helicopters', 'Fixed-Wing Aircraft', 'CISAR Teams', 'Drones/UAS', 'Swift Water Teams', 'Equipment'],
+        coverage: regionCoverage,
+        reliability: '99.7% uptime',
+        dataSources: 'USCG Air Stations, FEMA Urban Search & Rescue, National Guard, DoD Northern Command, State Emergency Response'
+      },
       {
         id: 'src1',
         name: 'Current Weather',
@@ -162,16 +269,18 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
         reliability: '99.9% uptime',
         dataSources: 'ICS-202 Forms, Planning Meeting Minutes, Tactics Meeting Notes, IAP Documentation, UC Meeting Records'
       }
-    ];
+    );
+    
+    return items;
   };
 
   const [dataSources, setDataSources] = useState<DataSourceItem[]>(
-    data.dataSources || generateDataForSelection('gulf-coast', 'oil-spill-alpha')
+    data.dataSources || generateDataForSelection('gulf-coast', 'oil-spill-alpha', 'region')
   );
 
   // Function to manually update data
   const handleUpdate = () => {
-    const newData = generateDataForSelection(selectedRegion, selectedIncident);
+    const newData = generateDataForSelection(selectedRegion, selectedIncident, filterMode);
     setDataSources(newData);
     persist(newData);
   };
@@ -195,8 +304,65 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
     onDataChange({ ...data, dataSources: items });
   };
 
+  const startEditSitrep = () => {
+    setSitrepDraft(sitrepContent);
+    setSitrepEditMode(true);
+  };
+
+  const saveSitrep = () => {
+    setSitrepContent(sitrepDraft);
+    const timestamp = new Date().toLocaleString('en-US', { 
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
+    }).replace(',', '');
+    setSitrepLastUpdated(timestamp);
+    onDataChange({ 
+      ...data, 
+      sitrep: sitrepDraft,
+      sitrepLastUpdated: timestamp,
+      sitrepLastUpdatedBy: sitrepLastUpdatedBy
+    });
+    setSitrepEditMode(false);
+  };
+
+  const cancelEditSitrep = () => {
+    setSitrepDraft('');
+    setSitrepEditMode(false);
+  };
+
+  const startEditFilter = () => {
+    setFilterModeDraft(filterMode);
+    setSelectedRegionDraft(selectedRegion);
+    setSelectedIncidentDraft(selectedIncident);
+    setFilterEditMode(true);
+  };
+
+  const saveFilterChanges = () => {
+    setFilterMode(filterModeDraft);
+    setSelectedRegion(selectedRegionDraft);
+    setSelectedIncident(selectedIncidentDraft);
+    const newData = generateDataForSelection(selectedRegionDraft, selectedIncidentDraft, filterModeDraft);
+    setDataSources(newData);
+    persist(newData);
+    setFilterEditMode(false);
+  };
+
+  const cancelEditFilter = () => {
+    setFilterModeDraft(filterMode);
+    setSelectedRegionDraft(selectedRegion);
+    setSelectedIncidentDraft(selectedIncident);
+    setFilterEditMode(false);
+  };
+
   const toggleSource = (id: string) => {
     setExpandedSources(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleChildIncident = (id: string) => {
+    setExpandedChildIncidents(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -304,18 +470,19 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
 
       {/* Filter Mode Toggle and Dropdown */}
       <div className="space-y-3 px-4 py-3 bg-[#222529] rounded-lg border border-[#6e757c]">
-        {/* Toggle Control with Update Button */}
+        {/* Toggle Control with Edit Icon */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="caption text-white whitespace-nowrap">Filter by:</span>
             <div className="flex items-center bg-[#14171a] rounded-[4px] border border-[#6e757c] overflow-hidden">
               <button
-                onClick={() => setFilterMode('region')}
+                onClick={() => filterEditMode && setFilterModeDraft('region')}
+                disabled={!filterEditMode}
                 className={`caption px-3 py-1 transition-colors ${
-                  filterMode === 'region'
+                  (filterEditMode ? filterModeDraft : filterMode) === 'region'
                     ? 'bg-accent text-accent-foreground'
                     : 'text-white hover:bg-[#222529]'
-                }`}
+                } ${!filterEditMode ? 'cursor-default' : ''}`}
                 style={{ 
                   fontFamily: "'Open Sans', sans-serif",
                   fontSize: '12px',
@@ -326,12 +493,13 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
                 Region
               </button>
               <button
-                onClick={() => setFilterMode('incident')}
+                onClick={() => filterEditMode && setFilterModeDraft('incident')}
+                disabled={!filterEditMode}
                 className={`caption px-3 py-1 transition-colors ${
-                  filterMode === 'incident'
+                  (filterEditMode ? filterModeDraft : filterMode) === 'incident'
                     ? 'bg-accent text-accent-foreground'
                     : 'text-white hover:bg-[#222529]'
-                }`}
+                } ${!filterEditMode ? 'cursor-default' : ''}`}
                 style={{ 
                   fontFamily: "'Open Sans', sans-serif",
                   fontSize: '12px',
@@ -343,146 +511,241 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
               </button>
             </div>
           </div>
-          <button
-            onClick={handleUpdate}
-            className="bg-[#01669f] h-[24px] rounded-[4px] px-4 hover:bg-[#01669f]/90 transition-colors flex items-center justify-center caption text-white"
-            style={{ 
-              fontFamily: "'Open Sans', sans-serif",
-              fontSize: '12px',
-              fontWeight: 400,
-              lineHeight: '18px'
-            }}
-          >
-            Update
-          </button>
+          {!filterEditMode && (
+            <button
+              onClick={startEditFilter}
+              className="p-1 hover:bg-muted/30 rounded transition-colors"
+              title="Edit Filter"
+            >
+              <Edit2 className="w-4 h-4 text-white" />
+            </button>
+          )}
         </div>
 
         {/* Conditional Dropdown */}
-        <div className="flex items-center gap-2">
-          <span className="caption text-white whitespace-nowrap">
-            {filterMode === 'region' ? 'Region:' : 'Incident:'}
-          </span>
-          {filterMode === 'region' ? (
-            <Popover open={regionPopoverOpen} onOpenChange={setRegionPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className="flex-1 h-[24px] bg-transparent border border-[#6e757c] rounded-[4px] px-2 caption text-white focus:outline-none focus:border-accent cursor-pointer flex items-center justify-between"
-                  style={{ 
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    lineHeight: '18px'
-                  }}
-                >
-                  {regions.find(r => r.id === selectedRegion)?.name || 'Select region...'}
-                  <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0 bg-[#222529] border-[#6e757c]" align="start">
-                <Command className="bg-[#222529]">
-                  <CommandInput 
-                    placeholder="Search region..." 
-                    className="h-9 caption text-white"
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="caption text-white whitespace-nowrap">
+              {(filterEditMode ? filterModeDraft : filterMode) === 'region' ? 'Region:' : 'Incident:'}
+            </span>
+            {(filterEditMode ? filterModeDraft : filterMode) === 'region' ? (
+              <Popover open={filterEditMode && regionPopoverOpen} onOpenChange={(open) => filterEditMode && setRegionPopoverOpen(open)}>
+                <PopoverTrigger asChild>
+                  <button
+                    onClick={(e) => !filterEditMode && e.preventDefault()}
+                    className={`flex-1 h-[24px] bg-transparent border border-[#6e757c] rounded-[4px] px-2 caption text-white focus:outline-none focus:border-accent flex items-center justify-between ${
+                      filterEditMode ? 'cursor-pointer' : 'cursor-default'
+                    }`}
                     style={{ 
                       fontFamily: "'Open Sans', sans-serif",
                       fontSize: '12px',
                       fontWeight: 400,
                       lineHeight: '18px'
                     }}
-                  />
-                  <CommandList>
-                    <CommandEmpty className="caption text-white/70 p-2">No region found.</CommandEmpty>
-                    <CommandGroup>
-                      {regions.map((region) => (
-                        <CommandItem
-                          key={region.id}
-                          value={region.name}
-                          onSelect={() => {
-                            setSelectedRegion(region.id);
-                            setRegionPopoverOpen(false);
-                          }}
-                          className="caption text-white cursor-pointer hover:bg-[#14171a] data-[selected=true]:bg-[#14171a]"
-                          style={{ 
-                            fontFamily: "'Open Sans', sans-serif",
-                            fontSize: '12px',
-                            fontWeight: 400,
-                            lineHeight: '18px'
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-3 w-3 ${
-                              selectedRegion === region.id ? 'opacity-100' : 'opacity-0'
-                            }`}
-                          />
-                          {region.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          ) : (
-            <Popover open={incidentPopoverOpen} onOpenChange={setIncidentPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className="flex-1 h-[24px] bg-transparent border border-[#6e757c] rounded-[4px] px-2 caption text-white focus:outline-none focus:border-accent cursor-pointer flex items-center justify-between"
-                  style={{ 
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    lineHeight: '18px'
-                  }}
-                >
-                  {incidents.find(i => i.id === selectedIncident)?.name || 'Select incident...'}
-                  <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0 bg-[#222529] border-[#6e757c]" align="start">
-                <Command className="bg-[#222529]">
-                  <CommandInput 
-                    placeholder="Search incident..." 
-                    className="h-9 caption text-white"
+                  >
+                    {regions.find(r => r.id === (filterEditMode ? selectedRegionDraft : selectedRegion))?.name || 'Select region...'}
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0 bg-[#222529] border-[#6e757c]" align="start">
+                  <Command className="bg-[#222529]">
+                    <CommandInput 
+                      placeholder="Search region..." 
+                      className="h-9 caption text-white"
+                      style={{ 
+                        fontFamily: "'Open Sans', sans-serif",
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        lineHeight: '18px'
+                      }}
+                    />
+                    <CommandList>
+                      <CommandEmpty className="caption text-white/70 p-2">No region found.</CommandEmpty>
+                      <CommandGroup>
+                        {regions.map((region) => (
+                          <CommandItem
+                            key={region.id}
+                            value={region.name}
+                            onSelect={() => {
+                              setSelectedRegionDraft(region.id);
+                              setRegionPopoverOpen(false);
+                            }}
+                            className="caption text-white cursor-pointer hover:bg-[#14171a] data-[selected=true]:bg-[#14171a]"
+                            style={{ 
+                              fontFamily: "'Open Sans', sans-serif",
+                              fontSize: '12px',
+                              fontWeight: 400,
+                              lineHeight: '18px'
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-3 w-3 ${
+                                (filterEditMode ? selectedRegionDraft : selectedRegion) === region.id ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                            {region.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Popover open={filterEditMode && incidentPopoverOpen} onOpenChange={(open) => filterEditMode && setIncidentPopoverOpen(open)}>
+                <PopoverTrigger asChild>
+                  <button
+                    onClick={(e) => !filterEditMode && e.preventDefault()}
+                    className={`flex-1 h-[24px] bg-transparent border border-[#6e757c] rounded-[4px] px-2 caption text-white focus:outline-none focus:border-accent flex items-center justify-between ${
+                      filterEditMode ? 'cursor-pointer' : 'cursor-default'
+                    }`}
                     style={{ 
                       fontFamily: "'Open Sans', sans-serif",
                       fontSize: '12px',
                       fontWeight: 400,
                       lineHeight: '18px'
                     }}
-                  />
-                  <CommandList>
-                    <CommandEmpty className="caption text-white/70 p-2">No incident found.</CommandEmpty>
-                    <CommandGroup>
-                      {incidents.map((incident) => (
-                        <CommandItem
-                          key={incident.id}
-                          value={incident.name}
-                          onSelect={() => {
-                            setSelectedIncident(incident.id);
-                            setIncidentPopoverOpen(false);
-                          }}
-                          className="caption text-white cursor-pointer hover:bg-[#14171a] data-[selected=true]:bg-[#14171a]"
-                          style={{ 
-                            fontFamily: "'Open Sans', sans-serif",
-                            fontSize: '12px',
-                            fontWeight: 400,
-                            lineHeight: '18px'
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-3 w-3 ${
-                              selectedIncident === incident.id ? 'opacity-100' : 'opacity-0'
-                            }`}
-                          />
-                          {incident.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                  >
+                    {incidents.find(i => i.id === (filterEditMode ? selectedIncidentDraft : selectedIncident))?.name || 'Select incident...'}
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0 bg-[#222529] border-[#6e757c]" align="start">
+                  <Command className="bg-[#222529]">
+                    <CommandInput 
+                      placeholder="Search incident..." 
+                      className="h-9 caption text-white"
+                      style={{ 
+                        fontFamily: "'Open Sans', sans-serif",
+                        fontSize: '12px',
+                        fontWeight: 400,
+                        lineHeight: '18px'
+                      }}
+                    />
+                    <CommandList>
+                      <CommandEmpty className="caption text-white/70 p-2">No incident found.</CommandEmpty>
+                      <CommandGroup>
+                        {incidents.map((incident) => (
+                          <CommandItem
+                            key={incident.id}
+                            value={incident.name}
+                            onSelect={() => {
+                              setSelectedIncidentDraft(incident.id);
+                              setIncidentPopoverOpen(false);
+                            }}
+                            className="caption text-white cursor-pointer hover:bg-[#14171a] data-[selected=true]:bg-[#14171a]"
+                            style={{ 
+                              fontFamily: "'Open Sans', sans-serif",
+                              fontSize: '12px',
+                              fontWeight: 400,
+                              lineHeight: '18px'
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-3 w-3 ${
+                                (filterEditMode ? selectedIncidentDraft : selectedIncident) === incident.id ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                            {incident.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+
+          {/* Update and Cancel Buttons - Only visible when in edit mode */}
+          {filterEditMode && (
+            <div className="flex gap-3">
+              <Button
+                onClick={saveFilterChanges}
+                className="bg-primary hover:bg-primary/90 px-4 h-auto text-xs"
+                style={{ paddingTop: '2px', paddingBottom: '2px' }}
+              >
+                Update
+              </Button>
+              <Button
+                onClick={cancelEditFilter}
+                variant="outline"
+                className="border-border px-4 h-auto text-xs"
+                style={{ paddingTop: '2px', paddingBottom: '2px' }}
+              >
+                Cancel
+              </Button>
+            </div>
           )}
+        </div>
+      </div>
+
+      {/* SITREP Section */}
+      <div className="mb-6">
+        <div className="border border-border rounded-lg overflow-hidden bg-card/30">
+          <div className="p-4 space-y-3">
+            {/* Header with Edit icon and Last Updated */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-white text-sm font-semibold">
+                  SITREP for {filterMode === 'region' 
+                    ? regions.find(r => r.id === selectedRegion)?.name 
+                    : incidents.find(i => i.id === selectedIncident)?.name}
+                </Label>
+                {!sitrepEditMode && filterMode === 'region' && selectedRegion === 'sector-new-york' && (
+                  <button
+                    onClick={startEditSitrep}
+                    className="p-1 hover:bg-muted/30 rounded transition-colors"
+                    title="Edit SITREP"
+                  >
+                    <Edit2 className="w-4 h-4 text-white" />
+                  </button>
+                )}
+              </div>
+              {sitrepLastUpdated && (
+                <span className="caption text-white/70 block">
+                  Last updated {sitrepLastUpdated} by {sitrepLastUpdatedBy}
+                </span>
+              )}
+            </div>
+
+            {/* Content - View or Edit mode */}
+            {sitrepEditMode ? (
+              <>
+                <Textarea
+                  value={sitrepDraft}
+                  onChange={(e) => setSitrepDraft(e.target.value)}
+                  placeholder="Enter situation report..."
+                  className="bg-input-background border-border min-h-[120px] resize-none"
+                />
+                <div className="flex gap-3">
+                  <Button
+                    onClick={saveSitrep}
+                    className="bg-primary hover:bg-primary/90 px-6 py-0.5 h-auto text-sm"
+                  >
+                    {filterMode === 'region' && selectedRegion === 'sector-new-york' 
+                      ? 'Submit to East District' 
+                      : 'Save'}
+                  </Button>
+                  <Button
+                    onClick={cancelEditSitrep}
+                    variant="outline"
+                    className="border-border px-6 py-0.5 h-auto text-sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="bg-input-background border border-border rounded p-3 min-h-[120px]">
+                <p className="caption text-white whitespace-pre-wrap">
+                  {filterMode === 'region' && selectedRegion === 'sector-new-york' 
+                    ? (sitrepContent || 'No SITREP entered yet. Click Edit to add one.')
+                    : 'SITREP editing is only available for Sector New York.'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -571,10 +834,135 @@ export function OverviewPhase({ data, onDataChange, onAddAIContext }: OverviewPh
                       <p className="caption text-white">{source.dataSources}</p>
                     </div>
                   )}
-                  <div>
-                    <label className="text-white mb-1 block">Placeholder Field for Data</label>
-                    <p className="caption text-white">Placeholder content</p>
-                  </div>
+                  
+                  {/* Child Incidents - Only for Active Incidents item */}
+                  {source.id === 'src0' && (
+                    <div className="mt-4">
+                      <label className="caption text-white mb-2 block">Active Incidents</label>
+                      <div className="space-y-3">
+                        {/* Child Incident 1 */}
+                        <div
+                          className="border border-border/50 rounded-lg overflow-hidden"
+                          style={{ backgroundColor: 'rgba(139, 123, 168, 0.15)' }}
+                        >
+                          <div
+                            className="p-3 cursor-pointer"
+                            onClick={() => toggleChildIncident('child-incident-1')}
+                          >
+                            <div className="flex items-start gap-2">
+                              {expandedChildIncidents.has('child-incident-1') ? (
+                                <ChevronDown className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+                              )}
+                              <div className="flex-1">
+                                <span className="caption text-white">Gulf Coast Pipeline Spill — Plaquemines Parish, LA</span>
+                                {!expandedChildIncidents.has('child-incident-1') && (
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                                      <span className="caption text-red-500">Critical</span>
+                                    </div>
+                                    <span className="caption text-white/70">Active Response</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {expandedChildIncidents.has('child-incident-1') && (
+                            <div className="p-3 space-y-3 bg-card/30">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Incident Type</label>
+                                  <p className="caption text-white">Oil Spill</p>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Severity</label>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    <span className="caption text-red-500">Critical</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Status</label>
+                                  <p className="caption text-white">Active Response</p>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Incident Commander</label>
+                                  <p className="caption text-white">CDR Sarah Mitchell, USCG</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Child Incident 2 */}
+                        <div
+                          className="border border-border/50 rounded-lg overflow-hidden"
+                          style={{ backgroundColor: 'rgba(139, 123, 168, 0.15)' }}
+                        >
+                          <div
+                            className="p-3 cursor-pointer"
+                            onClick={() => toggleChildIncident('child-incident-2')}
+                          >
+                            <div className="flex items-start gap-2">
+                              {expandedChildIncidents.has('child-incident-2') ? (
+                                <ChevronDown className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+                              )}
+                              <div className="flex-1">
+                                <span className="caption text-white">Delaware River Tanker Spill — Philadelphia, PA</span>
+                                {!expandedChildIncidents.has('child-incident-2') && (
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                                      <span className="caption text-orange-500">Major</span>
+                                    </div>
+                                    <span className="caption text-white/70">Containment Operations</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {expandedChildIncidents.has('child-incident-2') && (
+                            <div className="p-3 space-y-3 bg-card/30">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Incident Type</label>
+                                  <p className="caption text-white">Oil Spill</p>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Severity</label>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500" />
+                                    <span className="caption text-orange-500">Major</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Status</label>
+                                  <p className="caption text-white">Containment Operations</p>
+                                </div>
+                                <div>
+                                  <label className="caption text-white/70 mb-1 block">Incident Commander</label>
+                                  <p className="caption text-white">CAPT James Rodriguez, USCG</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {source.id !== 'src0' && (
+                    <div>
+                      <label className="text-white mb-1 block">Placeholder Field for Data</label>
+                      <p className="caption text-white">Placeholder content</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

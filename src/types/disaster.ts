@@ -54,5 +54,11 @@ export const OPERATIONAL_PERIOD_PHASES: Omit<DisasterPhase, 'completed' | 'data'
     name: 'Regions',
     shortName: 'Regions',
     description: 'Personnel assignments and organizational structure'
+  },
+  {
+    id: 'resources',
+    name: 'Resources',
+    shortName: 'Resources',
+    description: 'Resource management and allocation'
   }
 ];

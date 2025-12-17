@@ -41,7 +41,35 @@ interface ObjectivesActionsPhaseProps {
 }
 
 export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, onPrevious, onRecommendActions, onZoomToLocation, onAddAIContext, onApplyDataLayerFilter }: ObjectivesActionsPhaseProps) {
-  const [objectives, setObjectives] = useState<Objective[]>(data.objectives || [
+  // Helper functions for severity (defined before state to use in initial sort)
+  const getIncidentSeverityHelper = (id: string): 'Minor' | 'Moderate' | 'Serious' | 'Severe' | 'Critical' => {
+    switch (id) {
+      case '1': return 'Serious';
+      case '1a': return 'Moderate';
+      case '1b': return 'Serious';
+      case '2': return 'Moderate';
+      case '3': return 'Moderate';
+      case '3a': return 'Moderate';
+      case '3b': return 'Minor';
+      case '4': return 'Minor';
+      case '5': return 'Severe';
+      case '6': return 'Serious';
+      default: return 'Moderate';
+    }
+  };
+
+  const getSeverityRankHelper = (severity: string): number => {
+    switch (severity) {
+      case 'Critical': return 5;
+      case 'Severe': return 4;
+      case 'Serious': return 3;
+      case 'Moderate': return 2;
+      case 'Minor': return 1;
+      default: return 0;
+    }
+  };
+
+  const initialObjectives = data.objectives || [
     {
       id: '1',
       title: 'Gulf Coast Pipeline Spill — Plaquemines Parish, LA',
@@ -106,14 +134,23 @@ export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, on
       type: 'Operational',
       actions: []
     }
-  ]);
+  ];
+
+  // Sort by severity (Severe at top, then Serious, etc.)
+  const sortedObjectives = initialObjectives.sort((a, b) => {
+    const severityA = getIncidentSeverityHelper(a.id);
+    const severityB = getIncidentSeverityHelper(b.id);
+    return getSeverityRankHelper(severityB) - getSeverityRankHelper(severityA);
+  });
+
+  const [objectives, setObjectives] = useState<Objective[]>(sortedObjectives);
 
   const [editingObjective, setEditingObjective] = useState<string | null>(null);
   const [editingObjectiveOriginal, setEditingObjectiveOriginal] = useState<Objective | null>(null);
   const [editingAction, setEditingAction] = useState<{ objectiveId: string; actionId: string } | null>(null);
   const [editingActionOriginal, setEditingActionOriginal] = useState<Action | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set(objectives.map(o => o.id)));
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const [expandedChildIncidents, setExpandedChildIncidents] = useState<Set<string>>(new Set());
   const [isAddIncidentModalOpen, setIsAddIncidentModalOpen] = useState(false);
   const [selectedIncidentTypes, setSelectedIncidentTypes] = useState<string[]>([]);
@@ -171,6 +208,18 @@ export function ObjectivesActionsPhase({ data = {}, onDataChange, onComplete, on
       case '5': return 'Severe'; // Galveston Bay Barge Collision
       case '6': return 'Serious'; // Mobile Bay Pipeline Release
       default: return 'Moderate';
+    }
+  };
+
+  // Get severity rank (higher number = more severe)
+  const getSeverityRank = (severity: string): number => {
+    switch (severity) {
+      case 'Critical': return 5;
+      case 'Severe': return 4;
+      case 'Serious': return 3;
+      case 'Moderate': return 2;
+      case 'Minor': return 1;
+      default: return 0;
     }
   };
 

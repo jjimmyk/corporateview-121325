@@ -74,6 +74,22 @@ export function DataLayers({
   const [objectsExpanded, setObjectsExpanded] = React.useState(false);
   const [expandedObjects, setExpandedObjects] = React.useState<Set<string>>(new Set());
   const [objectSearchTerm, setObjectSearchTerm] = React.useState('');
+  const [selectedObjects, setSelectedObjects] = React.useState<Set<string>>(new Set());
+  const [bulkEditModalOpen, setBulkEditModalOpen] = React.useState(false);
+  const [addingNewObject, setAddingNewObject] = React.useState(false);
+  const [newObjectName, setNewObjectName] = React.useState('');
+  const [objectStatusFilter, setObjectStatusFilter] = React.useState<string[]>([]);
+  const [objectSignalStrengthFilter, setObjectSignalStrengthFilter] = React.useState<string[]>([]);
+  const [objectSourceFilter, setObjectSourceFilter] = React.useState<string[]>([]);
+  const [objectSectorFilter, setObjectSectorFilter] = React.useState<string[]>([]);
+  const [objectDistrictFilter, setObjectDistrictFilter] = React.useState<string[]>([]);
+  const [objectAreaFilter, setObjectAreaFilter] = React.useState<string[]>([]);
+  const [statusFilterOpen, setStatusFilterOpen] = React.useState(false);
+  const [signalStrengthFilterOpen, setSignalStrengthFilterOpen] = React.useState(false);
+  const [sourceFilterOpen, setSourceFilterOpen] = React.useState(false);
+  const [sectorFilterOpen, setSectorFilterOpen] = React.useState(false);
+  const [districtFilterOpen, setDistrictFilterOpen] = React.useState(false);
+  const [areaFilterOpen, setAreaFilterOpen] = React.useState(false);
   const [addLayerModalOpen, setAddLayerModalOpen] = React.useState(false);
   const [addLayerMode, setAddLayerMode] = React.useState<'upload' | 'draw'>('upload');
   const [addLayerCategory, setAddLayerCategory] = React.useState<string>('No Category');
@@ -84,6 +100,19 @@ export function DataLayers({
   const setRegionFilter = externalSetRegionFilter !== undefined ? externalSetRegionFilter : setLocalRegionFilter;
   const incidentFilter = externalIncidentFilter !== undefined ? externalIncidentFilter : localIncidentFilter;
   const setIncidentFilter = externalSetIncidentFilter !== undefined ? externalSetIncidentFilter : setLocalIncidentFilter;
+
+  // Initialize object filters with all options selected when layer changes
+  React.useEffect(() => {
+    if (individualLayerModalOpen && selectedIndividualLayer) {
+      const uniqueValues = getUniqueFieldValues(selectedIndividualLayer);
+      setObjectStatusFilter(uniqueValues.status);
+      setObjectSignalStrengthFilter(uniqueValues.signalStrength);
+      setObjectSourceFilter(uniqueValues.sources);
+      setObjectSectorFilter(uniqueValues.sectors);
+      setObjectDistrictFilter(uniqueValues.districts);
+      setObjectAreaFilter(uniqueValues.areas);
+    }
+  }, [individualLayerModalOpen, selectedIndividualLayer]);
 
   const toggleLayer = (layerId: string) => {
     setExpandedLayers(prev => {
@@ -230,14 +259,146 @@ export function DataLayers({
     });
   };
 
+  const toggleObjectSelection = (objectName: string) => {
+    setSelectedObjects(prev => {
+      const next = new Set(prev);
+      if (next.has(objectName)) {
+        next.delete(objectName);
+      } else {
+        next.add(objectName);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllObjects = (layerName: string) => {
+    const allObjects = getLayerObjects(layerName).slice(0, 2);
+    const allObjectNames = allObjects.map(obj => obj.name);
+    const allSelected = allObjectNames.every(name => selectedObjects.has(name));
+    
+    if (allSelected) {
+      // Deselect all
+      setSelectedObjects(prev => {
+        const next = new Set(prev);
+        allObjectNames.forEach(name => next.delete(name));
+        return next;
+      });
+    } else {
+      // Select all
+      setSelectedObjects(prev => {
+        const next = new Set(prev);
+        allObjectNames.forEach(name => next.add(name));
+        return next;
+      });
+    }
+  };
+
+  // Get unique values for each field type across all objects
+  const getUniqueFieldValues = (layerName: string) => {
+    const objects = getLayerObjects(layerName).slice(0, 2);
+    const allFields = objects.flatMap(obj => getObjectFields(obj.name));
+    
+    return {
+      status: Array.from(new Set(allFields.map(f => f.status))),
+      signalStrength: Array.from(new Set(allFields.map(f => f.signalStrength))),
+      sources: Array.from(new Set(allFields.map(f => f.source))),
+      sectors: Array.from(new Set(allFields.map(f => f.sector))),
+      districts: Array.from(new Set(allFields.map(f => f.district))),
+      areas: Array.from(new Set(allFields.map(f => f.area)))
+    };
+  };
+
+  // Toggle filter selection
+  const toggleFilterItem = (filterType: 'status' | 'signalStrength' | 'source' | 'sector' | 'district' | 'area', item: string) => {
+    const setFilter = {
+      status: setObjectStatusFilter,
+      signalStrength: setObjectSignalStrengthFilter,
+      source: setObjectSourceFilter,
+      sector: setObjectSectorFilter,
+      district: setObjectDistrictFilter,
+      area: setObjectAreaFilter
+    }[filterType];
+
+    const currentFilter = {
+      status: objectStatusFilter,
+      signalStrength: objectSignalStrengthFilter,
+      source: objectSourceFilter,
+      sector: objectSectorFilter,
+      district: objectDistrictFilter,
+      area: objectAreaFilter
+    }[filterType];
+
+    if (currentFilter.includes(item)) {
+      setFilter(currentFilter.filter(i => i !== item));
+    } else {
+      setFilter([...currentFilter, item]);
+    }
+  };
+
+  // Toggle select all for a filter
+  const toggleSelectAllFilter = (filterType: 'status' | 'signalStrength' | 'source' | 'sector' | 'district' | 'area', layerName: string) => {
+    const uniqueValues = getUniqueFieldValues(layerName);
+    const allItems = {
+      status: uniqueValues.status,
+      signalStrength: uniqueValues.signalStrength,
+      source: uniqueValues.sources,
+      sector: uniqueValues.sectors,
+      district: uniqueValues.districts,
+      area: uniqueValues.areas
+    }[filterType];
+
+    const setFilter = {
+      status: setObjectStatusFilter,
+      signalStrength: setObjectSignalStrengthFilter,
+      source: setObjectSourceFilter,
+      sector: setObjectSectorFilter,
+      district: setObjectDistrictFilter,
+      area: setObjectAreaFilter
+    }[filterType];
+
+    const currentFilter = {
+      status: objectStatusFilter,
+      signalStrength: objectSignalStrengthFilter,
+      source: objectSourceFilter,
+      sector: objectSectorFilter,
+      district: objectDistrictFilter,
+      area: objectAreaFilter
+    }[filterType];
+
+    if (currentFilter.length === allItems.length) {
+      setFilter([]);
+    } else {
+      setFilter(allItems);
+    }
+  };
+
   const getObjectFields = (objectName: string): Array<{ field: string; value: string; source: string; lastUpdated: string }> => {
-    // Return mock field data for each object
-    return [
-      { field: 'Latitude', value: '29.3547', source: 'CART', lastUpdated: '2025-11-15 14:05' },
-      { field: 'Longitude', value: '-89.6843', source: 'CART', lastUpdated: '2025-11-15 14:05' },
-      { field: 'Status', value: 'Active', source: 'PRATUS', lastUpdated: '2025-11-15 14:03' },
-      { field: 'Signal Strength', value: '87%', source: 'CART', lastUpdated: '2025-11-15 14:05' }
-    ];
+    // Return mock field data based on object name
+    if (objectName.includes('KHGX')) {
+      return [
+        { field: 'Latitude', value: '29.4719', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+        { field: 'Longitude', value: '-95.0792', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+        { field: 'Status', value: 'Active', source: 'PRATUS', lastUpdated: '2025-11-15 14:03' },
+        { field: 'District', value: 'District 8', source: 'PRATUS', lastUpdated: '2025-11-15 14:00' },
+        { field: 'Sector', value: 'Houston-Galveston', source: 'CART', lastUpdated: '2025-11-15 14:05' }
+      ];
+    } else if (objectName.includes('KLCH')) {
+      return [
+        { field: 'Latitude', value: '30.1253', source: 'CART', lastUpdated: '2025-11-15 14:04' },
+        { field: 'Longitude', value: '-93.2161', source: 'CART', lastUpdated: '2025-11-15 14:04' },
+        { field: 'Status', value: 'Active', source: 'PRATUS', lastUpdated: '2025-11-15 14:02' },
+        { field: 'District', value: 'District 8', source: 'PRATUS', lastUpdated: '2025-11-15 14:00' },
+        { field: 'Sector', value: 'Lake Charles', source: 'CART', lastUpdated: '2025-11-15 14:04' }
+      ];
+    } else {
+      return [
+        { field: 'Latitude', value: '30.3367', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+        { field: 'Longitude', value: '-89.8253', source: 'CART', lastUpdated: '2025-11-15 14:05' },
+        { field: 'Status', value: 'Standby', source: 'PRATUS', lastUpdated: '2025-11-15 14:01' },
+        { field: 'District', value: 'District 8', source: 'PRATUS', lastUpdated: '2025-11-15 14:00' },
+        { field: 'Sector', value: 'New Orleans', source: 'CART', lastUpdated: '2025-11-15 14:05' }
+      ];
+    }
   };
 
   const getLayerObjects = (layerName: string): Array<{ name: string; lastUpdated: string }> => {
@@ -1964,8 +2125,8 @@ export function DataLayers({
       
       {/* Individual Layer Modal */}
       <Dialog open={individualLayerModalOpen} onOpenChange={setIndividualLayerModalOpen}>
-        <DialogContent className="bg-[#222529] border-[#6e757c] text-white" style={{ maxWidth: '1008px' }}>
-          <DialogHeader>
+        <DialogContent className="bg-[#222529] border-[#6e757c] text-white overflow-hidden flex flex-col" style={{ maxWidth: '1008px', maxHeight: '90vh' }}>
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-white">
               {selectedIndividualLayer || 'Layer Details'}
             </DialogTitle>
@@ -1973,6 +2134,7 @@ export function DataLayers({
               Layer Details
             </DialogDescription>
           </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-2">
           {selectedIndividualLayer && (() => {
             const presets: Record<
               string,
@@ -2152,6 +2314,7 @@ export function DataLayers({
                       className="flex-1 bg-[#1a1d21] border-border text-white"
                     />
                     <Button
+                      onClick={() => setAddingNewObject(true)}
                       variant="outline"
                       size="sm"
                       className="bg-transparent border-border text-white hover:bg-muted/50 whitespace-nowrap"
@@ -2159,7 +2322,169 @@ export function DataLayers({
                       + Add Object
                     </Button>
                   </div>
+                  
+                  {/* Select All and Inline Bulk Edit Controls */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`select-all-objects-${selectedIndividualLayer}`}
+                        checked={getLayerObjects(selectedIndividualLayer).slice(0, 2).length > 0 && getLayerObjects(selectedIndividualLayer).slice(0, 2).every(obj => selectedObjects.has(obj.name))}
+                        onCheckedChange={() => toggleSelectAllObjects(selectedIndividualLayer)}
+                        className="border-border"
+                      />
+                      <label
+                        htmlFor={`select-all-objects-${selectedIndividualLayer}`}
+                        className="text-xs text-white cursor-pointer whitespace-nowrap"
+                      >
+                        Select All
+                      </label>
+                    </div>
+                    
+                    {selectedObjects.size > 0 && (
+                      <>
+                        <Select>
+                          <SelectTrigger className="bg-[#1a1d21] border-border text-white h-9 w-[140px]">
+                            <SelectValue placeholder="Field to edit" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#222529] border-[#6e757c]">
+                            <SelectItem value="value" className="text-white">Value</SelectItem>
+                            <SelectItem value="source" className="text-white">Source</SelectItem>
+                            <SelectItem value="lastUpdated" className="text-white">Last Updated</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        <Input
+                          type="text"
+                          placeholder="New value..."
+                          className="flex-1 bg-[#1a1d21] border-border text-white h-9"
+                        />
+                        
+                        <Button
+                          onClick={() => {
+                            // Apply bulk edit logic here
+                            setSelectedObjects(new Set());
+                          }}
+                          size="sm"
+                          className="bg-primary hover:bg-primary/90 whitespace-nowrap"
+                        >
+                          Apply Changes
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="space-y-4">
+                    {/* New Object Form */}
+                    {addingNewObject && (
+                      <div
+                        className="border border-accent rounded-lg overflow-hidden"
+                        style={{
+                          background:
+                            'linear-gradient(90deg, rgba(2, 163, 254, 0.15) 0%, rgba(0, 0, 0, 0) 100%), linear-gradient(90deg, rgb(20, 23, 26) 0%, rgb(20, 23, 26) 100%)'
+                        }}
+                      >
+                        <div className="p-3 space-y-3">
+                          <div>
+                            <Input
+                              type="text"
+                              placeholder="Enter object name..."
+                              value={newObjectName}
+                              onChange={(e) => setNewObjectName(e.target.value)}
+                              className="w-full bg-[#1a1d21] border-border text-white"
+                              autoFocus
+                            />
+                          </div>
+                          
+                          {/* Fields */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs text-white/70 mb-1 block">Latitude</Label>
+                              <Input
+                                type="text"
+                                placeholder="29.4719"
+                                className="bg-[#1a1d21] border-border text-white text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/70 mb-1 block">Longitude</Label>
+                              <Input
+                                type="text"
+                                placeholder="-95.0792"
+                                className="bg-[#1a1d21] border-border text-white text-sm"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Draw Location Button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-border text-white hover:bg-muted/20"
+                          >
+                            <Map className="w-4 h-4 mr-2" />
+                            Draw Location on Map
+                          </Button>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <Label className="text-xs text-white/70 mb-1 block">Status</Label>
+                              <Select>
+                                <SelectTrigger className="bg-[#1a1d21] border-border text-white text-sm h-8">
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent className="bg-[#222529] border-[#6e757c]">
+                                  <SelectItem value="active" className="text-white">Active</SelectItem>
+                                  <SelectItem value="standby" className="text-white">Standby</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/70 mb-1 block">District</Label>
+                              <Input
+                                type="text"
+                                placeholder="District 8"
+                                className="bg-[#1a1d21] border-border text-white text-sm h-8"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-white/70 mb-1 block">Sector</Label>
+                              <Input
+                                type="text"
+                                placeholder="Gulf Coast"
+                                className="bg-[#1a1d21] border-border text-white text-sm h-8"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Save/Cancel Buttons */}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => {
+                                // Save logic here
+                                setAddingNewObject(false);
+                                setNewObjectName('');
+                              }}
+                              size="sm"
+                              className="bg-primary hover:bg-primary/90"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setAddingNewObject(false);
+                                setNewObjectName('');
+                              }}
+                              size="sm"
+                              variant="outline"
+                              className="border-border"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Existing Objects */}
                     {getLayerObjects(selectedIndividualLayer)
                       .slice(0, 2)
                       .filter(obj => obj.name.toLowerCase().includes(objectSearchTerm.toLowerCase()))
@@ -2174,18 +2499,27 @@ export function DataLayers({
                             'linear-gradient(90deg, rgba(2, 163, 254, 0.08) 0%, rgba(0, 0, 0, 0) 100%), linear-gradient(90deg, rgb(20, 23, 26) 0%, rgb(20, 23, 26) 100%)'
                         }}
                       >
-                        <div 
-                          className="p-3 cursor-pointer hover:bg-muted/10"
-                          onClick={() => toggleObject(obj.name)}
-                        >
+                        <div className="p-3 hover:bg-muted/10">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              {isExpanded ? (
-                                <ChevronDown className="w-4 h-4 text-white flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-white flex-shrink-0" />
-                              )}
-                              <span className="text-white">{obj.name}</span>
+                              <Checkbox
+                                id={`object-${idx}-${obj.name}`}
+                                checked={selectedObjects.has(obj.name)}
+                                onCheckedChange={() => toggleObjectSelection(obj.name)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="border-border"
+                              />
+                              <div 
+                                className="flex items-center gap-2 cursor-pointer flex-1"
+                                onClick={() => toggleObject(obj.name)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-white flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-white flex-shrink-0" />
+                                )}
+                                <span className="text-white">{obj.name}</span>
+                              </div>
                             </div>
                             <span className="text-xs text-white/50">Last updated: {obj.lastUpdated}</span>
                           </div>
@@ -2253,6 +2587,7 @@ export function DataLayers({
               </div>
             );
           })()}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -2352,6 +2687,87 @@ export function DataLayers({
                   </Command>
                 </PopoverContent>
               </Popover>
+            </div>
+
+            {/* Submit and Cancel Buttons */}
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  // Submit logic here
+                  setAddLayerModalOpen(false);
+                }}
+                className="bg-primary hover:bg-primary/90 px-6 py-0.5 h-auto text-sm"
+              >
+                Submit to East District
+              </Button>
+              <Button
+                onClick={() => setAddLayerModalOpen(false)}
+                variant="outline"
+                className="border-border px-6 py-0.5 h-auto text-sm"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Modal */}
+      <Dialog open={bulkEditModalOpen} onOpenChange={setBulkEditModalOpen}>
+        <DialogContent className="bg-[#222529] border-[#6e757c] text-white" style={{ maxWidth: '600px' }}>
+          <DialogHeader>
+            <DialogTitle className="text-white">Bulk Edit Objects ({selectedObjects.size} selected)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className="text-sm text-white/70">
+              Edit fields for selected objects. Changes will apply to all {selectedObjects.size} selected object(s).
+            </p>
+            
+            {/* Field Selection */}
+            <div className="space-y-3">
+              <div>
+                <Label className="text-white mb-2 block">Field to Edit</Label>
+                <Select>
+                  <SelectTrigger className="bg-[#1a1d21] border-border text-white">
+                    <SelectValue placeholder="Select field..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#222529] border-[#6e757c]">
+                    <SelectItem value="value" className="text-white">Value</SelectItem>
+                    <SelectItem value="source" className="text-white">Source</SelectItem>
+                    <SelectItem value="lastUpdated" className="text-white">Last Updated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label className="text-white mb-2 block">New Value</Label>
+                <Input
+                  type="text"
+                  placeholder="Enter new value..."
+                  className="bg-[#1a1d21] border-border text-white"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                onClick={() => setBulkEditModalOpen(false)}
+                variant="outline"
+                className="border-border text-white hover:bg-muted/20"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  // Apply bulk edit logic here
+                  setBulkEditModalOpen(false);
+                  setSelectedObjects(new Set());
+                }}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Apply Changes
+              </Button>
             </div>
           </div>
         </DialogContent>

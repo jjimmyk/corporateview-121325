@@ -351,6 +351,8 @@ export default function App() {
             }
           }}
         />;
+      case 'resources':
+        return <div className="p-4"></div>;
       case 'safety-analysis':
         return <SafetyAnalysisPhase {...commonProps} />;
       default:
@@ -501,8 +503,6 @@ export default function App() {
               PRATUS AI
             </Button>
           </div>
-          {/* User Avatar */}
-          <div className="bg-center bg-cover bg-no-repeat h-[46px] rounded-[72px] shrink-0 w-11" style={{ backgroundImage: `url('${imgCapsule}'), url('${imgCapsule1}')` }} />
         </div>
       </div>
 
@@ -690,9 +690,45 @@ export default function App() {
               portal-url="https://disastertech.maps.arcgis.com"
             />
           </div>
+          
+          {/* My Sector and Exit Map Button - positioned above map and data layers */}
+          <div className="absolute top-4 right-4 z-40 flex items-center gap-3">
+            {/* My Sector Component */}
+            <div 
+              className="px-4 py-2 rounded-lg border border-purple-500/50 text-white font-medium flex items-center gap-2"
+              style={{
+                backgroundColor: '#2d1b4e',
+                boxShadow: '0 0 20px rgba(147, 51, 234, 0.2), 0 0 40px rgba(147, 51, 234, 0.1)'
+              }}
+            >
+              <span>My Sector: New York</span>
+              <button
+                onClick={() => {
+                  setMapCenter('-74.0060,40.7128');
+                  setMapScale('144447');
+                }}
+                className="hover:bg-purple-600/30 rounded p-1 transition-colors"
+                title="Zoom to New York City"
+              >
+                <Map className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Exit Map Button */}
+            <Button
+              onClick={() => setShowFullscreenMap(false)}
+              variant="outline"
+              className="border-border hover:bg-muted/20"
+              style={{ backgroundColor: 'black' }}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Exit Map
+            </Button>
+          </div>
+          
           {/* Data Layers overlay with collapse/expand (right side) */}
           {!rightPanelCollapsed && (
-            <div className="absolute right-4 z-40" style={{ top: '80px', width: '360px' }}>
+            <div className="absolute right-4 z-40" style={{ top: '116px', width: '360px' }}>
               <div className="relative">
                 <DataLayers
                   className="border border-border rounded-md shadow-sm"
@@ -709,7 +745,7 @@ export default function App() {
           {rightPanelCollapsed && (
             <div
               className="absolute z-40 cursor-pointer opacity-80 hover:opacity-100"
-              style={{ top: '80px', right: 0, height: '540px', width: '32px', backgroundColor: '#000000' }}
+              style={{ top: '116px', right: 0, height: '540px', width: '32px', backgroundColor: '#000000' }}
               onClick={() => setRightPanelCollapsed(false)}
               title="Expand data layers"
             >
@@ -869,18 +905,6 @@ export default function App() {
               </div>
             </div>
           )}
-          <div className="absolute top-4 right-4 z-[60]">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFullscreenMap(false)}
-              className="hover:bg-muted flex items-center gap-2"
-              style={{ backgroundColor: 'black' }}
-            >
-              <X className="w-4 h-4" />
-              Exit Map
-            </Button>
-          </div>
           {/* Click-capture overlay for selecting polygons/points on the map */}
           {isSelectingOnMap && (
             <div
@@ -907,9 +931,8 @@ export default function App() {
           {mapPanelDock === 'left' ? (
             <>
               {!leftPanelCollapsed && (
-                <div className="absolute top-0 bottom-0 left-0 border-r border-border" style={{ width: '33.33vw', overflow: 'hidden', backgroundColor: 'black' }}>
+                <div className="absolute bottom-0 left-0 border-r border-border" style={{ top: '0', width: '33.33vw', overflow: 'hidden', backgroundColor: 'black' }}>
                   <div className="relative h-full flex flex-col" style={{ overflow: 'hidden', backgroundColor: 'black' }}>
-                    {/* Drag-to-bottom handle removed */}
                     <div className="border-b border-border flex-shrink-0" style={{ position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'black' }}>
                       <style>{`
                         .planning-stepper-map-view .bg-card {
@@ -1098,8 +1121,8 @@ export default function App() {
               )}
               {leftPanelCollapsed && (
                 <div
-                  className="absolute top-0 bottom-0 left-0 z-40 cursor-pointer opacity-80 hover:opacity-100"
-                  style={{ width: '5vw', backgroundColor: '#000000' }}
+                  className="absolute bottom-0 left-0 z-40 cursor-pointer opacity-80 hover:opacity-100"
+                  style={{ top: '0', width: '5vw', backgroundColor: '#000000' }}
                   onClick={() => setLeftPanelCollapsed(false)}
                   title="Expand panel"
                 />
